@@ -24,7 +24,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pion/dtls/v3"
+	"github.com/pion/dtls/v4"
 	"github.com/pion/ice/v4"
 	"github.com/pion/logging"
 	"github.com/pion/rtcp"
@@ -34,8 +34,8 @@ import (
 	"github.com/pion/transport/v5/test"
 	"github.com/pion/transport/v5/vnet"
 	"github.com/pion/turn/v5"
-	"github.com/pion/webrtc/v4/internal/util"
-	"github.com/pion/webrtc/v4/pkg/rtcerr"
+	"github.com/pion/webrtc/v5/internal/util"
+	"github.com/pion/webrtc/v5/pkg/rtcerr"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -460,8 +460,8 @@ func TestPeerConnection_ShutdownNoDTLS(t *testing.T) {
 	dropAllDTLS := func([]byte) bool {
 		return false
 	}
-	offerPC.dtlsTransport.dtlsMatcher = dropAllDTLS
-	answerPC.dtlsTransport.dtlsMatcher = dropAllDTLS
+	offerPC.iceTransport.dtlsMatcher = dropAllDTLS
+	answerPC.iceTransport.dtlsMatcher = dropAllDTLS
 
 	assert.NoError(t, signalPair(offerPC, answerPC))
 
@@ -2024,6 +2024,9 @@ func TestPeerConnectionDeadlock(t *testing.T) {
 // Assert that by default NULL Ciphers aren't enabled. Even if
 // the remote Peer Requests a NULL Cipher we should fail.
 func TestPeerConnectionNoNULLCipherDefault(t *testing.T) {
+	defer test.TimeOut(10 * time.Second).Stop()
+	defer test.CheckRoutines(t)()
+
 	settingEngine := SettingEngine{}
 	settingEngine.SetSRTPProtectionProfiles(dtls.SRTP_NULL_HMAC_SHA1_80, dtls.SRTP_NULL_HMAC_SHA1_32)
 	offerPC, err := NewAPI(WithSettingEngine(settingEngine)).NewPeerConnection(Configuration{})
@@ -2031,20 +2034,19 @@ func TestPeerConnectionNoNULLCipherDefault(t *testing.T) {
 
 	answerPC, err := NewPeerConnection(Configuration{})
 	assert.NoError(t, err)
+	defer closePairNow(t, offerPC, answerPC)
 
-	assert.NoError(t, signalPair(offerPC, answerPC))
-
-	peerConnectionClosed := make(chan struct{})
-	var closeOnce sync.Once
-
-	answerPC.OnConnectionStateChange(func(s PeerConnectionState) {
-		if s == PeerConnectionStateClosed {
-			closeOnce.Do(func() { close(peerConnectionClosed) })
+	dtlsFailed, dtlsFailedCancel := context.WithCancel(context.Background())
+	defer dtlsFailedCancel()
+	answerPC.SCTP().Transport().OnStateChange(func(s DTLSTransportState) {
+		if s == DTLSTransportStateFailed {
+			dtlsFailedCancel()
 		}
 	})
 
-	<-peerConnectionClosed
-	closePairNow(t, offerPC, answerPC)
+	assert.NoError(t, signalPair(offerPC, answerPC))
+	<-dtlsFailed.Done()
+	assert.Equal(t, DTLSTransportStateFailed, answerPC.SCTP().Transport().State())
 }
 
 func TestICETricklingSupported(t *testing.T) {
@@ -2579,7 +2581,7 @@ func TestAlwaysNegotiateDataChannels_CreateDataChannel(t *testing.T) { //nolint:
 	})
 
 	connected := untilConnectionState(PeerConnectionStateConnected, pcOffer, pcAnswer)
-	require.NoError(t, signalPairWithOptions(pcOffer, pcAnswer, withDisableInitialDataChannel(true)))
+	require.NoError(t, signalPairWithOptions(pcOffer, pcAnswer, withDisableInitialDataChannel()))
 
 	select {
 	case <-connected:
@@ -2717,7 +2719,7 @@ func TestSctpSnap_RenegotiationAddsSctpInit(t *testing.T) {
 	assert.NoError(t, err)
 
 	connected := untilConnectionState(PeerConnectionStateConnected, offerPC, answerPC)
-	assert.NoError(t, signalPairWithOptions(offerPC, answerPC, withDisableInitialDataChannel(true)))
+	assert.NoError(t, signalPairWithOptions(offerPC, answerPC, withDisableInitialDataChannel()))
 	<-connected
 
 	// Round 2: add a data channel and renegotiate.

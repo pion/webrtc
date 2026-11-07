@@ -11,7 +11,7 @@ import (
 	"syscall/js"
 
 	"github.com/pion/ice/v4"
-	"github.com/pion/webrtc/v4/pkg/rtcerr"
+	"github.com/pion/webrtc/v5/pkg/rtcerr"
 )
 
 // PeerConnection represents a WebRTC connection that establishes a
@@ -263,6 +263,9 @@ func (pc *PeerConnection) GetConfiguration() Configuration {
 
 // CreateOffer starts the PeerConnection and generates the localDescription
 func (pc *PeerConnection) CreateOffer(options *OfferOptions) (_ SessionDescription, err error) {
+	if options != nil && options.DTLSRestart {
+		return SessionDescription{}, &rtcerr.NotSupportedError{Err: ErrDTLSRestartNotSupported}
+	}
 	defer func() {
 		if e := recover(); e != nil {
 			err = recoveryToError(e)

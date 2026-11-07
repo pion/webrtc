@@ -34,15 +34,13 @@ type Configuration struct {
 
 	// Certificates describes a set of certificates that the PeerConnection
 	// uses to authenticate. Valid values for this parameter are created
-	// through calls to the GenerateCertificate function. Although any given
-	// DTLS connection will use only one certificate, this attribute allows the
-	// caller to provide multiple certificates that support different
-	// algorithms. The final certificate will be selected based on the DTLS
-	// handshake, which establishes which certificates are allowed. The
-	// PeerConnection implementation selects which of the certificates is
-	// used for a given connection; how certificates are selected is outside
-	// the scope of this specification. If this value is absent, then a default
-	// set of certificates is generated for each PeerConnection instance.
+	// through calls to the GenerateCertificate function. The first certificate
+	// is used initially. With multiple certificates, each completed locally
+	// initiated DTLS restart selects the next certificate in order, wrapping
+	// around to the first. With only one certificate, a locally initiated DTLS
+	// restart generates a new certificate using the existing certificate's
+	// private key. If this value is absent, a default
+	// certificate is generated for each PeerConnection instance.
 	Certificates []Certificate `json:"certificates,omitempty"`
 
 	// ICECandidatePoolSize describes the size of the prefetched ICE pool.

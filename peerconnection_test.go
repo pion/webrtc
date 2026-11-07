@@ -12,7 +12,7 @@ import (
 
 	"github.com/pion/sdp/v3"
 	"github.com/pion/transport/v5/test"
-	"github.com/pion/webrtc/v4/pkg/rtcerr"
+	"github.com/pion/webrtc/v5/pkg/rtcerr"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -43,9 +43,9 @@ func withModificationFunc(f func(string) string) func(*signalPairOptions) {
 	}
 }
 
-func withDisableInitialDataChannel(disable bool) func(*signalPairOptions) {
+func withDisableInitialDataChannel() func(*signalPairOptions) {
 	return func(o *signalPairOptions) {
-		o.disableInitialDataChannel = disable
+		o.disableInitialDataChannel = true
 	}
 }
 
@@ -886,44 +886,6 @@ func TestTransportChain(t *testing.T) {
 	assert.NotNil(t, offer.SCTP().Transport().ICETransport())
 
 	closePairNow(t, offer, answer)
-}
-
-// Assert that the PeerConnection closes via DTLS (and not ICE).
-func TestDTLSClose(t *testing.T) {
-	lim := test.TimeOut(time.Second * 10)
-	defer lim.Stop()
-
-	report := test.CheckRoutines(t)
-	defer report()
-
-	pcOffer, pcAnswer, err := newPair()
-	assert.NoError(t, err)
-
-	_, err = pcOffer.AddTransceiverFromKind(RTPCodecTypeVideo)
-	assert.NoError(t, err)
-
-	peerConnectionsConnected := untilConnectionState(PeerConnectionStateConnected, pcOffer, pcAnswer)
-
-	offer, err := pcOffer.CreateOffer(nil)
-	assert.NoError(t, err)
-
-	offerGatheringComplete := GatheringCompletePromise(pcOffer)
-	assert.NoError(t, pcOffer.SetLocalDescription(offer))
-	<-offerGatheringComplete
-
-	assert.NoError(t, pcAnswer.SetRemoteDescription(*pcOffer.LocalDescription()))
-
-	answer, err := pcAnswer.CreateAnswer(nil)
-	assert.NoError(t, err)
-
-	answerGatheringComplete := GatheringCompletePromise(pcAnswer)
-	assert.NoError(t, pcAnswer.SetLocalDescription(answer))
-	<-answerGatheringComplete
-
-	assert.NoError(t, pcOffer.SetRemoteDescription(*pcAnswer.LocalDescription()))
-
-	<-peerConnectionsConnected
-	assert.NoError(t, pcOffer.Close())
 }
 
 func TestPeerConnection_SessionID(t *testing.T) {

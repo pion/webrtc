@@ -14,9 +14,10 @@ import (
 	"time"
 
 	"github.com/pion/datachannel"
-	"github.com/pion/dtls/v3"
-	"github.com/pion/dtls/v3/pkg/crypto/elliptic"
-	"github.com/pion/dtls/v3/pkg/protocol/handshake"
+	"github.com/pion/dtls/v4"
+	dtlsCipherSuite "github.com/pion/dtls/v4/pkg/crypto/ciphersuite"
+	"github.com/pion/dtls/v4/pkg/crypto/elliptic"
+	"github.com/pion/dtls/v4/pkg/protocol/handshake"
 	"github.com/pion/ice/v4"
 	"github.com/pion/stun/v4"
 	"github.com/pion/transport/v5/test"
@@ -393,8 +394,8 @@ func TestSetHooks(t *testing.T) {
 	settingEngine.SetDTLSServerHelloMessageHook(func(msg handshake.MessageServerHello) handshake.Message {
 		return &msg
 	})
-	settingEngine.SetDTLSCertificateRequestMessageHook(func(msg handshake.MessageCertificateRequest) handshake.Message {
-		return &msg
+	settingEngine.SetDTLSCertificateRequestMessageHook(func(msg handshake.Message) handshake.Message {
+		return msg
 	})
 
 	assert.NotNil(t, settingEngine.dtls.clientHelloMessageHook, "Failed to set DTLS Client Hello Hook")
@@ -448,29 +449,6 @@ func TestSetFireOnTrackBeforeFirstRTP(t *testing.T) {
 	sendVideoUntilDone(t, onTrackFired.Done(), []*TrackLocalStaticSample{track})
 
 	closePairNow(t, offerer, answerer)
-}
-
-func TestDisableCloseByDTLS(t *testing.T) {
-	lim := test.TimeOut(time.Second * 30)
-	defer lim.Stop()
-
-	report := test.CheckRoutines(t)
-	defer report()
-
-	s := SettingEngine{}
-	s.DisableCloseByDTLS(true)
-
-	offer, answer, err := NewAPI(WithSettingEngine(s)).newPair(Configuration{})
-	assert.NoError(t, err)
-
-	assert.NoError(t, signalPair(offer, answer))
-
-	<-untilConnectionState(PeerConnectionStateConnected, offer, answer)
-	assert.NoError(t, answer.Close())
-
-	time.Sleep(time.Second)
-	assert.True(t, offer.ConnectionState() == PeerConnectionStateConnected)
-	assert.NoError(t, offer.Close())
 }
 
 func TestEnableDataChannelBlockWrite(t *testing.T) {
@@ -637,17 +615,24 @@ func TestSettingEngine_DTLSSetters(t *testing.T) {
 	se.SetDTLSClientCAs(clientCAs)
 	se.SetDTLSRootCAs(rootCAs)
 	se.SetDTLSKeyLogWriter(&keyBuf)
-	se.SetDTLSCipherSuites(dtls.TLS_ECDHE_ECDSA_WITH_AES_128_CCM_8, dtls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256)
+	se.SetDTLSCipherSuites(
+		dtlsCipherSuite.TLS_ECDHE_ECDSA_WITH_AES_128_CCM_8,
+		dtlsCipherSuite.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
+	)
 	se.SetDTLSSupportedProtocols("webrtc")
 
 	called := false
-	se.SetDTLSCustomerCipherSuites(func() []dtls.CipherSuite {
+	se.SetDTLSCustomerCipherSuites(func() []dtlsCipherSuite.Suite {
 		called = true
 
 		return nil
 	})
 
-	assert.True(t, se.dtls.insecureSkipHelloVerify)
+	assert.True(t, *se.dtls.insecureSkipHelloVerify)
+	se.SetDTLSInsecureSkipHelloVerify(false)
+	assert.False(t, *se.dtls.insecureSkipHelloVerify)
+	se.SetDTLSInsecureSkipHelloVerify(true)
+	assert.True(t, *se.dtls.insecureSkipHelloVerify)
 	assert.True(t, se.dtls.disableInsecureSkipVerify)
 	assert.Equal(t, dtls.RequireExtendedMasterSecret, se.dtls.extendedMasterSecret)
 	assert.NotNil(t, se.dtls.clientAuth)
@@ -656,7 +641,10 @@ func TestSettingEngine_DTLSSetters(t *testing.T) {
 	assert.Equal(t, rootCAs, se.dtls.rootCAs)
 	_, _ = se.dtls.keyLogWriter.Write([]byte("test"))
 	assert.NotZero(t, keyBuf.Len())
-	assert.Equal(t, []dtls.CipherSuiteID{dtls.TLS_ECDHE_ECDSA_WITH_AES_128_CCM_8, dtls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256}, se.dtls.cipherSuites)
+	assert.Equal(t, []dtlsCipherSuite.ID{
+		dtlsCipherSuite.TLS_ECDHE_ECDSA_WITH_AES_128_CCM_8,
+		dtlsCipherSuite.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
+	}, se.dtls.cipherSuites)
 	_ = se.dtls.customCipherSuites()
 	assert.Equal(t, []string{"webrtc"}, se.dtls.supportedProtocols)
 	assert.True(t, called)

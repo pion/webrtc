@@ -25,8 +25,8 @@ import (
 	"github.com/pion/rtcp"
 	"github.com/pion/sdp/v3"
 	"github.com/pion/srtp/v3"
-	"github.com/pion/webrtc/v4/internal/util"
-	"github.com/pion/webrtc/v4/pkg/rtcerr"
+	"github.com/pion/webrtc/v5/internal/util"
+	"github.com/pion/webrtc/v5/pkg/rtcerr"
 )
 
 // PeerConnection represents a WebRTC connection that establishes a
@@ -65,6 +65,11 @@ type PeerConnection struct {
 
 	lastOffer  string
 	lastAnswer string
+
+	lastOfferCertificate    *Certificate
+	lastOfferDTLSID         string
+	pendingLocalCertificate *Certificate
+	certificateIndex        int
 	// Whether the remote endpoint can accept trickled ICE candidates.
 	canTrickleICECandidates ICETrickleCapability
 
@@ -87,6 +92,7 @@ type PeerConnection struct {
 	iceGatherer   *ICEGatherer
 	iceTransport  *ICETransport
 	dtlsTransport *DTLSTransport
+	dtlsID        string
 	sctpTransport *SCTPTransport
 
 	// A reference to the associated API state used by this connection
@@ -188,6 +194,9 @@ func (api *API) NewPeerConnection(configuration Configuration) (*PeerConnection,
 		return nil, err
 	}
 	pc.dtlsTransport = dtlsTransport
+	pc.dtlsTransport.internalOnStateChangeHandler = func(state DTLSTransportState) {
+		pc.updateConnectionState(pc.ICEConnectionState(), state)
+	}
 
 	// Create the SCTP transport
 	pc.sctpTransport = pc.api.NewSCTPTransport(pc.dtlsTransport)
@@ -695,10 +704,25 @@ func (pc *PeerConnection) hasLocalDescriptionChanged(desc *SessionDescription) b
 	return false
 }
 
+func (pc *PeerConnection) nextDTLSCertificate() (*Certificate, error) {
+	if len(pc.configuration.Certificates) == 1 {
+		pc.log.Warn("Only one certificate configured for DTLS restart; generating a new certificate")
+
+		return GenerateCertificate(pc.configuration.Certificates[0].privateKey)
+	}
+	next := (pc.certificateIndex + 1) % len(pc.configuration.Certificates)
+	certificate := pc.configuration.Certificates[next]
+	if !certificate.Expires().IsZero() && time.Now().After(certificate.Expires()) {
+		return nil, &rtcerr.InvalidAccessError{Err: ErrCertificateExpired}
+	}
+
+	return &certificate, nil
+}
+
 // CreateOffer starts the PeerConnection and generates the localDescription
 // https://w3c.github.io/webrtc-pc/#dom-rtcpeerconnection-createoffer
 //
-//nolint:cyclop
+//nolint:gocognit,gocyclo,cyclop
 func (pc *PeerConnection) CreateOffer(options *OfferOptions) (SessionDescription, error) {
 	useIdentity := pc.idpLoginURL != nil
 	switch {
@@ -708,7 +732,8 @@ func (pc *PeerConnection) CreateOffer(options *OfferOptions) (SessionDescription
 		return SessionDescription{}, &rtcerr.InvalidStateError{Err: ErrConnectionClosed}
 	}
 
-	if options != nil && options.ICERestart {
+	// DTLS restart offers also restart ICE.
+	if options != nil && (options.ICERestart || options.DTLSRestart) && pc.iceGatherer.getAgent() != nil {
 		if err := pc.iceTransport.restart(); err != nil {
 			return SessionDescription{}, err
 		}
@@ -727,6 +752,24 @@ func (pc *PeerConnection) CreateOffer(options *OfferOptions) (SessionDescription
 	count := 0
 	pc.mu.Lock()
 	defer pc.mu.Unlock()
+	dtlsID := pc.dtlsID
+	if pc.lastOfferDTLSID != "" {
+		dtlsID = pc.lastOfferDTLSID
+	}
+	certificate := pc.lastOfferCertificate
+	if options != nil && options.DTLSRestart {
+		dtlsID = rand.Text()
+		if pc.currentLocalDescription != nil {
+			certificate, err = pc.nextDTLSCertificate()
+			if err != nil {
+				return SessionDescription{}, err
+			}
+		}
+	}
+	offerCertificate := pc.configuration.Certificates[pc.certificateIndex]
+	if certificate != nil {
+		offerCertificate = *certificate
+	}
 	for {
 		// We cache current transceivers to ensure they aren't
 		// mutated during offer generation. We later check if they have
@@ -779,7 +822,7 @@ func (pc *PeerConnection) CreateOffer(options *OfferOptions) (SessionDescription
 		}
 
 		if pc.currentRemoteDescription == nil {
-			descr, err = pc.generateUnmatchedSDP(currentTransceivers, useIdentity)
+			descr, err = pc.generateUnmatchedSDP(currentTransceivers, useIdentity, offerCertificate)
 		} else {
 			descr, err = pc.generateMatchedSDP(
 				currentTransceivers,
@@ -787,6 +830,7 @@ func (pc *PeerConnection) CreateOffer(options *OfferOptions) (SessionDescription
 				true, /*includeUnmatched */
 				connectionRoleFromDtlsRole(defaultDtlsRoleOffer),
 				false,
+				offerCertificate,
 			)
 		}
 
@@ -801,6 +845,7 @@ func (pc *PeerConnection) CreateOffer(options *OfferOptions) (SessionDescription
 			descr.WithICERenomination()
 		}
 
+		addTLSID(descr, dtlsID)
 		updateSDPOrigin(&pc.sdpOrigin, descr)
 		sdpBytes, err := descr.Marshal()
 		if err != nil {
@@ -825,6 +870,8 @@ func (pc *PeerConnection) CreateOffer(options *OfferOptions) (SessionDescription
 	}
 
 	pc.lastOffer = offer.SDP
+	pc.lastOfferDTLSID = dtlsID
+	pc.lastOfferCertificate = certificate
 
 	return offer, nil
 }
@@ -963,11 +1010,12 @@ func (pc *PeerConnection) CreateAnswer(options *AnswerOptions) (SessionDescripti
 	pc.mu.Lock()
 	defer pc.mu.Unlock()
 
-	// Renegotiation reuses the DTLS association, including across ICE restarts.
+	restartDTLS := remoteDTLSRestart(pc.currentRemoteDescription, pc.currentLocalDescription, remoteDesc)
+	// Preserve the negotiated roles unless restarting DTLS.
 	// "the answerer MUST insert an SDP "setup" attribute with an attribute value
 	// that does not change the previously negotiated DTLS roles"
 	// https://www.rfc-editor.org/info/rfc8842/#section-5.3
-	if pc.currentLocalDescription != nil && pc.currentRemoteDescription != nil {
+	if pc.currentLocalDescription != nil && pc.currentRemoteDescription != nil && !restartDTLS {
 		if pc.currentLocalDescription.Type == SDPTypeAnswer {
 			connectionRole = connectionRoleFromDtlsRole(dtlsRoleFromSDP(pc.currentLocalDescription.parsed))
 		} else {
@@ -987,6 +1035,7 @@ func (pc *PeerConnection) CreateAnswer(options *AnswerOptions) (SessionDescripti
 		false, /*includeUnmatched */
 		connectionRole,
 		pc.api.settingEngine.ignoreRidPauseForRecv,
+		pc.configuration.Certificates[pc.certificateIndex],
 	)
 	if err != nil {
 		return SessionDescription{}, err
@@ -999,6 +1048,13 @@ func (pc *PeerConnection) CreateAnswer(options *AnswerOptions) (SessionDescripti
 		descr.WithICERenomination()
 	}
 
+	if remoteTLSID(remoteDesc.parsed) != "" {
+		dtlsID := pc.dtlsID
+		if dtlsID == "" || restartDTLS {
+			dtlsID = rand.Text()
+		}
+		addTLSID(descr, dtlsID)
+	}
 	updateSDPOrigin(&pc.sdpOrigin, descr)
 	sdpBytes, err := descr.Marshal()
 	if err != nil {
@@ -1051,6 +1107,7 @@ func (pc *PeerConnection) setDescription(sd *SessionDescription, op stateChangeO
 				nextState, err = checkNextSignalingState(cur, SignalingStateHaveLocalOffer, setLocal, sd.Type)
 				if err == nil {
 					pc.pendingLocalDescription = sd
+					pc.pendingLocalCertificate = pc.lastOfferCertificate
 				}
 			// have-remote-offer->SetLocal(answer)->stable
 			// have-local-pranswer->SetLocal(answer)->stable
@@ -1064,11 +1121,16 @@ func (pc *PeerConnection) setDescription(sd *SessionDescription, op stateChangeO
 					pc.currentRemoteDescription = pc.pendingRemoteDescription
 					pc.pendingRemoteDescription = nil
 					pc.pendingLocalDescription = nil
+					pc.dtlsID = remoteTLSID(sd.parsed)
+					pc.lastOfferCertificate, pc.pendingLocalCertificate = nil, nil
+					pc.lastOfferDTLSID = ""
 				}
 			case SDPTypeRollback:
 				nextState, err = checkNextSignalingState(cur, SignalingStateStable, setLocal, sd.Type)
 				if err == nil {
 					pc.pendingLocalDescription = nil
+					pc.lastOfferCertificate, pc.pendingLocalCertificate = nil, nil
+					pc.lastOfferDTLSID = ""
 				}
 			// have-remote-offer->SetLocal(pranswer)->have-local-pranswer
 			case SDPTypePranswer:
@@ -1089,6 +1151,8 @@ func (pc *PeerConnection) setDescription(sd *SessionDescription, op stateChangeO
 				nextState, err = checkNextSignalingState(cur, SignalingStateHaveRemoteOffer, setRemote, sd.Type)
 				if err == nil {
 					pc.pendingRemoteDescription = sd
+					pc.lastOfferCertificate = nil
+					pc.lastOfferDTLSID = ""
 				}
 			// have-local-offer->SetRemote(answer)->stable
 			// have-remote-pranswer->SetRemote(answer)->stable
@@ -1097,6 +1161,19 @@ func (pc *PeerConnection) setDescription(sd *SessionDescription, op stateChangeO
 				if err == nil {
 					pc.currentRemoteDescription = sd
 					pc.currentLocalDescription = pc.pendingLocalDescription
+					if certificate := pc.pendingLocalCertificate; certificate != nil {
+						if len(pc.configuration.Certificates) == 1 {
+							pc.configuration.Certificates = []Certificate{*certificate}
+						} else {
+							pc.certificateIndex = (pc.certificateIndex + 1) % len(pc.configuration.Certificates)
+						}
+						pc.dtlsTransport.lock.Lock()
+						pc.dtlsTransport.certificates = []Certificate{*certificate}
+						pc.dtlsTransport.lock.Unlock()
+					}
+					pc.dtlsID = remoteTLSID(pc.currentLocalDescription.parsed)
+					pc.lastOfferCertificate, pc.pendingLocalCertificate = nil, nil
+					pc.lastOfferDTLSID = ""
 					pc.pendingRemoteDescription = nil
 					pc.pendingLocalDescription = nil
 				}
@@ -1143,7 +1220,10 @@ func (pc *PeerConnection) SetLocalDescription(desc SessionDescription) error {
 		return &rtcerr.InvalidStateError{Err: ErrConnectionClosed}
 	}
 
+	pc.mu.RLock()
 	haveLocalDescription := pc.currentLocalDescription != nil
+	restartDTLS := remoteDTLSRestart(pc.currentRemoteDescription, pc.currentLocalDescription, pc.pendingRemoteDescription)
+	pc.mu.RUnlock()
 
 	// JSEP 5.4
 	if desc.SDP == "" {
@@ -1192,6 +1272,9 @@ func (pc *PeerConnection) SetLocalDescription(desc SessionDescription) error {
 		}
 		pc.configureRTPReceivers(haveLocalDescription, remoteDesc, currentTransceivers)
 		pc.ops.Enqueue(func() {
+			if restartDTLS {
+				pc.restartDTLS(remoteDesc, &desc)
+			}
 			pc.startRTP(remoteDesc, currentTransceivers)
 		})
 	}
@@ -1243,8 +1326,6 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error {
 		return &rtcerr.InvalidStateError{Err: ErrConnectionClosed}
 	}
 
-	isRenegotiation := pc.currentRemoteDescription != nil
-
 	if _, err := desc.Unmarshal(); err != nil {
 		return err
 	}
@@ -1258,11 +1339,28 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error {
 		return cryptexErr
 	}
 
-	if err := pc.setDescription(&desc, stateChangeOpSetRemote); err != nil {
+	fingerprint, fingerprintHash, err := extractFingerprint(desc.parsed)
+	if err != nil {
 		return err
 	}
 
-	if err := pc.api.mediaEngine.updateFromRemoteDescription(*desc.parsed); err != nil {
+	pc.mu.RLock()
+	isRenegotiation := pc.currentRemoteDescription != nil
+	restartDTLS := remoteDTLSRestart(pc.currentRemoteDescription, pc.currentLocalDescription, &desc) ||
+		(desc.Type == SDPTypeAnswer && pc.pendingLocalCertificate != nil)
+	var restartErr error
+	if restartDTLS {
+		restartErr = pc.validateDTLSRestart(&desc)
+	}
+	pc.mu.RUnlock()
+	if restartErr != nil {
+		return &rtcerr.OperationError{Err: restartErr}
+	}
+	if err = pc.setDescription(&desc, stateChangeOpSetRemote); err != nil {
+		return err
+	}
+
+	if err = pc.api.mediaEngine.updateFromRemoteDescription(*desc.parsed); err != nil {
 		return err
 	}
 
@@ -1315,8 +1413,8 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error {
 			if transceiver == nil {
 				transceiver, localTransceivers = satisfyTypeAndDirection(kind, direction, localTransceivers)
 			} else if direction == RTPTransceiverDirectionInactive {
-				if err := transceiver.Stop(); err != nil {
-					return err
+				if stopErr := transceiver.Stop(); stopErr != nil {
+					return stopErr
 				}
 			}
 			if transceiver != nil {
@@ -1325,9 +1423,9 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error {
 
 			switch {
 			case transceiver == nil:
-				receiver, err := pc.api.NewRTPReceiver(kind, pc.dtlsTransport)
-				if err != nil {
-					return err
+				receiver, receiverErr := pc.api.NewRTPReceiver(kind, pc.dtlsTransport)
+				if receiverErr != nil {
+					return receiverErr
 				}
 
 				localDirection := RTPTransceiverDirectionRecvonly
@@ -1363,8 +1461,8 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error {
 			}
 
 			if transceiver.Mid() == "" {
-				if err := transceiver.SetMid(midValue); err != nil {
-					return err
+				if midErr := transceiver.SetMid(midValue); midErr != nil {
+					return midErr
 				}
 			}
 		}
@@ -1396,7 +1494,7 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error {
 
 	currentTransceivers := append([]*RTPTransceiver{}, pc.GetTransceivers()...)
 
-	if isRenegotiation {
+	if isRenegotiation { //nolint:nestif
 		if weOffer {
 			_ = setRTPTransceiverCurrentDirection(&desc, currentTransceivers, true)
 			if err = pc.startRTPSenders(currentTransceivers); err != nil {
@@ -1404,6 +1502,9 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error {
 			}
 			pc.configureRTPReceivers(true, &desc, currentTransceivers)
 			pc.ops.Enqueue(func() {
+				if restartDTLS {
+					pc.restartDTLS(&desc, pc.CurrentLocalDescription())
+				}
 				pc.startRTP(&desc, currentTransceivers)
 			})
 		}
@@ -1421,11 +1522,6 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error {
 	}
 
 	remoteIsLite := isIceLiteSet(desc.parsed)
-
-	fingerprint, fingerprintHash, err := extractFingerprint(desc.parsed)
-	if err != nil {
-		return err
-	}
 
 	iceRole := ICERoleControlled
 	// If one of the agents is lite and the other one is not, the lite agent must be the controlled agent.
@@ -3086,19 +3182,6 @@ func (pc *PeerConnection) startTransports(
 		return
 	}
 
-	pc.dtlsTransport.internalOnCloseHandler = func() {
-		if pc.isClosed.Load() || pc.api.settingEngine.disableCloseByDTLS {
-			return
-		}
-
-		pc.log.Info("Closing PeerConnection from DTLS CloseNotify")
-		go func() {
-			if pcClosErr := pc.Close(); pcClosErr != nil {
-				pc.log.Warnf("Failed to close PeerConnection from DTLS CloseNotify: %s", pcClosErr)
-			}
-		}()
-	}
-
 	pc.dtlsTransport.setLocalCryptexMode(localCryptexMode)
 	pc.dtlsTransport.setRemoteCryptexMode(remoteCryptexMode)
 
@@ -3107,7 +3190,6 @@ func (pc *PeerConnection) startTransports(
 		Role:         dtlsRole,
 		Fingerprints: []DTLSFingerprint{{Algorithm: fingerprintHash, Value: fingerprint}},
 	})
-	pc.updateConnectionState(pc.ICEConnectionState(), pc.dtlsTransport.State())
 	if err != nil {
 		pc.log.Warnf("Failed to start manager: %s", err)
 
@@ -3147,6 +3229,7 @@ func (pc *PeerConnection) startRTP(
 func (pc *PeerConnection) generateUnmatchedSDP(
 	transceivers []*RTPTransceiver,
 	useIdentity bool,
+	certificate Certificate,
 ) (*sdp.SessionDescription, error) {
 	desc, err := sdp.NewJSEPSessionDescription(useIdentity)
 	if err != nil {
@@ -3237,7 +3320,7 @@ func (pc *PeerConnection) generateUnmatchedSDP(
 		}
 	}
 
-	dtlsFingerprints, err := pc.configuration.Certificates[0].GetFingerprints()
+	dtlsFingerprints, err := certificate.GetFingerprints()
 	if err != nil {
 		return nil, err
 	}
@@ -3271,6 +3354,7 @@ func (pc *PeerConnection) generateMatchedSDP(
 	useIdentity, includeUnmatched bool,
 	connectionRole sdp.ConnectionRole,
 	ignoreRidPauseForRecv bool,
+	certificate Certificate,
 ) (*sdp.SessionDescription, error) {
 	desc, err := sdp.NewJSEPSessionDescription(useIdentity)
 	if err != nil {
@@ -3463,7 +3547,7 @@ func (pc *PeerConnection) generateMatchedSDP(
 		pc.log.Info("Plan-B Offer detected; responding with Plan-B Answer")
 	}
 
-	dtlsFingerprints, err := pc.configuration.Certificates[0].GetFingerprints()
+	dtlsFingerprints, err := certificate.GetFingerprints()
 	if err != nil {
 		return nil, err
 	}
@@ -3516,4 +3600,55 @@ func hasMedia(remoteDesc *SessionDescription, transceivers []*RTPTransceiver) bo
 	}
 
 	return false
+}
+
+// validateDTLSRestart requires the caller.
+// https://www.rfc-editor.org/rfc/rfc8842.html#section-6
+// https://www.rfc-editor.org/rfc/rfc9429.html#section-5.11
+func (pc *PeerConnection) validateDTLSRestart(remote *SessionDescription) error {
+	pairs := [][2]*SessionDescription{{pc.currentRemoteDescription, remote}}
+	if remote.Type == SDPTypeAnswer || remote.Type == SDPTypePranswer {
+		pairs = append(pairs, [2]*SessionDescription{pc.currentLocalDescription, pc.pendingLocalDescription})
+	}
+	for _, pair := range pairs {
+		if pair[0] == nil || pair[1] == nil {
+			return ErrDTLSRestartRequiresICERestart
+		}
+		previous, err := extractICEDetails(pair[0].parsed, pc.log)
+		if err != nil {
+			return err
+		}
+		current, err := extractICEDetails(pair[1].parsed, pc.log)
+		if err != nil {
+			return err
+		}
+		if previous.Ufrag == current.Ufrag || previous.Password == current.Password {
+			return ErrDTLSRestartRequiresICERestart
+		}
+	}
+
+	return nil
+}
+
+func (pc *PeerConnection) restartDTLS(remote, local *SessionDescription) {
+	if pc.isClosed.Load() {
+		return
+	}
+
+	pc.mu.RLock()
+	fingerprint, hash, err := extractFingerprint(remote.parsed)
+	role := negotiatedDTLSRole(remote, local)
+	pc.mu.RUnlock()
+	if err != nil {
+		pc.log.Warnf("Failed to restart DTLS: %s", err)
+
+		return
+	}
+	err = pc.dtlsTransport.start(DTLSParameters{
+		Role:         role,
+		Fingerprints: []DTLSFingerprint{{Algorithm: hash, Value: fingerprint}},
+	}, DTLSTransportStateConnected, pc.api.settingEngine.dtls.connectContextMaker)
+	if err != nil {
+		pc.log.Warnf("Failed to restart DTLS: %s", err)
+	}
 }

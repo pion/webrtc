@@ -27,8 +27,8 @@ import (
 	"time"
 
 	"github.com/pion/datachannel"
-	"github.com/pion/dtls/v3"
-	"github.com/pion/dtls/v3/pkg/crypto/selfsign"
+	"github.com/pion/dtls/v4"
+	"github.com/pion/dtls/v4/pkg/crypto/selfsign"
 	"github.com/pion/ice/v4"
 	"github.com/pion/logging"
 	"github.com/pion/sctp"
@@ -223,7 +223,7 @@ func runStack(
 	events.publish(sessionID, logEvent("ice", "connected: "+iceConn.RemoteAddr().String()))
 
 	packetConn := &connectedPacketConn{Conn: iceConn, remote: iceConn.RemoteAddr()}
-	dtlsConn, err := dtls.ServerWithOptions(
+	dtlsConn, err := dtls.Server(
 		packetConn,
 		packetConn.remote,
 		dtls.WithCertificates(cert),

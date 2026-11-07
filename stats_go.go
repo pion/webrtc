@@ -27,6 +27,13 @@ func (r StatsReport) GetConnectionStats(conn *PeerConnection) (PeerConnectionSta
 	return pcStats, true
 }
 
+// GetTransportStats returns the combined transport stats for a given DTLSTransport.
+func (r StatsReport) GetTransportStats(transport *DTLSTransport) (TransportStats, bool) {
+	stats, ok := r[transport.statsID].(TransportStats)
+
+	return stats, ok
+}
+
 // GetDataChannelStats is a helper method to return the associated stats for a given DataChannel.
 func (r StatsReport) GetDataChannelStats(dc *DataChannel) (DataChannelStats, bool) {
 	statsID := dc.getStatsID()

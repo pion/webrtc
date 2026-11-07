@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/pion/webrtc/v4/internal/fmtp"
+	"github.com/pion/webrtc/v5/internal/fmtp"
 )
 
 // RTPCodecType determines the type of a codec.

@@ -16,7 +16,7 @@ import (
 	"time"
 
 	"github.com/pion/ice/v4"
-	"github.com/pion/webrtc/v4/pkg/media"
+	"github.com/pion/webrtc/v5/pkg/media"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -1202,10 +1202,10 @@ func getCodecStats(t *testing.T, report StatsReport, c *RTPCodecParameters) Code
 	return stats
 }
 
-func getTransportStats(t *testing.T, report StatsReport, statsID string) TransportStats {
+func getTransportStats(t *testing.T, report StatsReport, transport *DTLSTransport) TransportStats {
 	t.Helper()
 
-	stats, ok := report[statsID]
+	stats, ok := report[transport.statsID]
 	assert.True(t, ok)
 	transportStats, ok := stats.(TransportStats)
 	assert.True(t, ok)
@@ -1387,8 +1387,9 @@ func TestPeerConnection_GetStats(t *testing.T) { //nolint:cyclop // involves mul
 
 	baseLineReportPCOffer := offerPC.GetStats()
 	baseLineReportPCAnswer := answerPC.GetStats()
-	for _, report := range []StatsReport{baseLineReportPCOffer, baseLineReportPCAnswer} {
-		stats := getTransportStats(t, report, "iceTransport")
+	for i, report := range []StatsReport{baseLineReportPCOffer, baseLineReportPCAnswer} {
+		transport := []*DTLSTransport{offerPC.dtlsTransport, answerPC.dtlsTransport}[i]
+		stats := getTransportStats(t, report, transport)
 		assert.Empty(t, stats.DTLSCipher)
 		assert.Empty(t, stats.SRTPCipher)
 		encoded, marshalErr := json.Marshal(stats)
@@ -1573,11 +1574,11 @@ func TestPeerConnection_GetStats(t *testing.T) { //nolint:cyclop // involves mul
 	dcStatsAnswer = getDataChannelStats(t, reportPCAnswer, answerDC)
 	assert.Equal(t, DataChannelStateClosed, dcStatsAnswer.State)
 
-	answerICETransportStats := getTransportStats(t, reportPCAnswer, "iceTransport")
-	offerICETransportStats := getTransportStats(t, reportPCOffer, "iceTransport")
-	assert.Equal(t, "FEFD", offerICETransportStats.TLSVersion)
-	assert.Equal(t, "FEFD", answerICETransportStats.TLSVersion)
-	assert.Equal(t, "TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256", offerICETransportStats.DTLSCipher)
+	answerICETransportStats := getTransportStats(t, reportPCAnswer, answerPC.dtlsTransport)
+	offerICETransportStats := getTransportStats(t, reportPCOffer, offerPC.dtlsTransport)
+	assert.Equal(t, "FEFC", offerICETransportStats.TLSVersion)
+	assert.Equal(t, "FEFC", answerICETransportStats.TLSVersion)
+	assert.Equal(t, "TLS_AES_128_GCM_SHA256", offerICETransportStats.DTLSCipher)
 	assert.Equal(t, offerICETransportStats.DTLSCipher, answerICETransportStats.DTLSCipher)
 	assert.Equal(t, "SRTP_AEAD_AES_256_GCM", offerICETransportStats.SRTPCipher)
 	assert.Equal(t, offerICETransportStats.SRTPCipher, answerICETransportStats.SRTPCipher)

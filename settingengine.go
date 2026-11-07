@@ -13,9 +13,11 @@ import (
 	"net"
 	"time"
 
-	"github.com/pion/dtls/v3"
-	dtlsElliptic "github.com/pion/dtls/v3/pkg/crypto/elliptic"
-	"github.com/pion/dtls/v3/pkg/protocol/handshake"
+	"github.com/pion/dtls/v4"
+	dtlsCipherSuite "github.com/pion/dtls/v4/pkg/crypto/ciphersuite"
+	dtlsElliptic "github.com/pion/dtls/v4/pkg/crypto/elliptic"
+	"github.com/pion/dtls/v4/pkg/protocol"
+	"github.com/pion/dtls/v4/pkg/protocol/handshake"
 	"github.com/pion/ice/v4"
 	"github.com/pion/logging"
 	"github.com/pion/stun/v4"
@@ -67,7 +69,9 @@ type SettingEngine struct {
 		SRTCP *uint
 	}
 	dtls struct {
-		insecureSkipHelloVerify       bool
+		minVersion                    protocol.Version
+		maxVersion                    protocol.Version
+		insecureSkipHelloVerify       *bool
 		disableInsecureSkipVerify     bool
 		retransmissionInterval        time.Duration
 		ellipticCurves                []dtlsElliptic.Curve
@@ -77,11 +81,11 @@ type SettingEngine struct {
 		clientCAs                     *x509.CertPool
 		rootCAs                       *x509.CertPool
 		keyLogWriter                  io.Writer
-		cipherSuites                  []dtls.CipherSuiteID
-		customCipherSuites            func() []dtls.CipherSuite
+		cipherSuites                  []dtlsCipherSuite.ID
+		customCipherSuites            func() []dtlsCipherSuite.Suite
 		clientHelloMessageHook        func(handshake.MessageClientHello) handshake.Message
 		serverHelloMessageHook        func(handshake.MessageServerHello) handshake.Message
-		certificateRequestMessageHook func(handshake.MessageCertificateRequest) handshake.Message
+		certificateRequestMessageHook func(handshake.Message) handshake.Message
 		supportedProtocols            []string
 	}
 	sctp struct {
@@ -114,7 +118,6 @@ type SettingEngine struct {
 	receiveMTU                                uint
 	iceMaxBindingRequests                     *uint16
 	fireOnTrackBeforeFirstRTP                 bool
-	disableCloseByDTLS                        bool
 	dataChannelBlockWrite                     bool
 	handleUndeclaredSSRCWithoutAnswer         bool
 	ignoreRidPauseForRecv                     bool
@@ -543,17 +546,31 @@ func (e *SettingEngine) SetReceiveMTU(receiveMTU uint) {
 	e.receiveMTU = receiveMTU
 }
 
+// SetDTLSMinVersion sets the minimum supported DTLS version.
+// The default is DTLS 1.2. A zero value restores the default.
+func (e *SettingEngine) SetDTLSMinVersion(version protocol.Version) {
+	e.dtls.minVersion = version
+}
+
+// SetDTLSMaxVersion sets the maximum supported DTLS version.
+// The default is DTLS 1.3. A zero value restores the default.
+func (e *SettingEngine) SetDTLSMaxVersion(version protocol.Version) {
+	e.dtls.maxVersion = version
+}
+
 // SetDTLSRetransmissionInterval sets the retranmission interval for DTLS.
 func (e *SettingEngine) SetDTLSRetransmissionInterval(interval time.Duration) {
 	e.dtls.retransmissionInterval = interval
 }
 
 // SetDTLSInsecureSkipHelloVerify sets the skip HelloVerify flag for DTLS.
-// If true and when acting as DTLS server, will allow client to skip hello verify phase and
-// receive ServerHello after initial ClientHello. This will mean faster connect times,
-// but will have lower DoS attack resistance.
+//
+// The HelloVerifyRequest cookie exchange is skipped by default when using a
+// full ICE agent, since ICE connectivity checks have already validated the
+// remote address. It is enabled by default when using an ICE Lite agent.
+// This setting overrides the default when acting as DTLS server.
 func (e *SettingEngine) SetDTLSInsecureSkipHelloVerify(skip bool) {
-	e.dtls.insecureSkipHelloVerify = skip
+	e.dtls.insecureSkipHelloVerify = &skip
 }
 
 // SetDTLSDisableInsecureSkipVerify sets the disable skip insecure verify flag for DTLS.
@@ -631,13 +648,13 @@ func (e *SettingEngine) SetSCTPMaxMessageSize(maxMessageSize uint32) {
 // SetDTLSCipherSuites allows the user to specify a list of DTLS CipherSuites.
 // This allow to control which ciphers implemented by pion/dtls are used during the DTLS handshake.
 // It can be used for DTLS connection hardening.
-func (e *SettingEngine) SetDTLSCipherSuites(cipherSuites ...dtls.CipherSuiteID) {
+func (e *SettingEngine) SetDTLSCipherSuites(cipherSuites ...dtlsCipherSuite.ID) {
 	e.dtls.cipherSuites = cipherSuites
 }
 
 // SetDTLSCustomerCipherSuites allows the user to specify a list of custom DTLS CipherSuites.
 // It allows to use custom/private DTLS CipherSuites in addition to the ones implemented by pion/dtls.
-func (e *SettingEngine) SetDTLSCustomerCipherSuites(customCipherSuites func() []dtls.CipherSuite) {
+func (e *SettingEngine) SetDTLSCustomerCipherSuites(customCipherSuites func() []dtlsCipherSuite.Suite) {
 	e.dtls.customCipherSuites = customCipherSuites
 }
 
@@ -654,9 +671,10 @@ func (e *SettingEngine) SetDTLSServerHelloMessageHook(hook func(handshake.Messag
 }
 
 // SetDTLSCertificateRequestMessageHook if not nil, is called when a DTLS Certificate Request message is sent
-// from a client. The returned handshake message replaces the original message.
+// from a server using DTLS 1.2 or 1.3. The hook receives a *dtls12.MessageCertificateRequest
+// or *dtls13.MessageCertificateRequest. The returned handshake message replaces the original message.
 func (e *SettingEngine) SetDTLSCertificateRequestMessageHook(
-	hook func(handshake.MessageCertificateRequest) handshake.Message,
+	hook func(handshake.Message) handshake.Message,
 ) {
 	e.dtls.certificateRequestMessageHook = hook
 }
@@ -709,13 +727,6 @@ func (e *SettingEngine) SetICEBindingRequestHandler(
 // Note: This does not yet affect simulcast tracks.
 func (e *SettingEngine) SetFireOnTrackBeforeFirstRTP(fireOnTrackBeforeFirstRTP bool) {
 	e.fireOnTrackBeforeFirstRTP = fireOnTrackBeforeFirstRTP
-}
-
-// DisableCloseByDTLS sets if the connection should be closed when dtls transport is closed.
-// Setting this to true will keep the connection open when dtls transport is closed
-// and relies on the ice failed state to detect the connection is interrupted.
-func (e *SettingEngine) DisableCloseByDTLS(isEnabled bool) {
-	e.disableCloseByDTLS = isEnabled
 }
 
 // SetHandleUndeclaredSSRCWithoutAnswer controls if an SDP answer is required for
