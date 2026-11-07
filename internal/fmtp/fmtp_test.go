@@ -53,6 +53,11 @@ func TestParseParameters(t *testing.T) {
 	}
 }
 
+func TestREDDefaults(t *testing.T) {
+	assert.True(t, ClockRateEqual("audio/red", 0, 48000))
+	assert.True(t, ChannelsEqual("audio/red", 0, 2))
+}
+
 func TestParse(t *testing.T) {
 	for _, ca := range []struct {
 		name      string

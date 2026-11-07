@@ -6,18 +6,31 @@
 package webrtc
 
 import (
+	"errors"
+	"fmt"
+	"strings"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/pion/interceptor"
 	"github.com/pion/interceptor/pkg/ccfb"
 	"github.com/pion/interceptor/pkg/flexfec"
 	"github.com/pion/interceptor/pkg/nack"
+	"github.com/pion/interceptor/pkg/red"
 	"github.com/pion/interceptor/pkg/report"
 	"github.com/pion/interceptor/pkg/stats"
 	"github.com/pion/interceptor/pkg/twcc"
 	"github.com/pion/rtp"
 	"github.com/pion/sdp/v3"
+)
+
+var (
+	errOpusREDNilMediaEngine         = errors.New("media engine must not be nil")
+	errOpusREDNilInterceptorRegistry = errors.New("interceptor registry must not be nil")
+	errOpusREDPayloadTypeOutOfRange  = errors.New("opus RED payload types must fit in seven bits")
+	errOpusREDPayloadTypeZero        = errors.New("opus RED payload type must not be zero")
+	errOpusREDPayloadTypeCollision   = errors.New("opus and RED payload types must be distinct")
 )
 
 // RegisterDefaultInterceptors will register some useful interceptors.
@@ -168,6 +181,8 @@ func ConfigureNackWithOptions(mediaEngine *MediaEngine, interceptorRegistry *int
 
 // ConfigureTWCCHeaderExtensionSender will setup everything necessary for adding
 // a TWCC header extension to outgoing RTP packets. This will allow the remote peer to generate TWCC reports.
+// When using ConfigureOpusRED, call this function afterward so RED's packet-size
+// limit includes the TWCC header extension.
 func ConfigureTWCCHeaderExtensionSender(mediaEngine *MediaEngine, interceptorRegistry *interceptor.Registry) error {
 	if err := mediaEngine.RegisterHeaderExtension(
 		RTPHeaderExtensionCapability{URI: sdp.TransportCCURI}, RTPCodecTypeVideo,
@@ -298,6 +313,120 @@ func ConfigureFlexFEC03(
 	}
 
 	interceptorRegistry.Add(generator)
+
+	return nil
+}
+
+func validateOpusREDConfiguration(
+	opusPayloadType, redPayloadType PayloadType,
+	mediaEngine *MediaEngine,
+	interceptorRegistry *interceptor.Registry,
+) error {
+	switch {
+	case mediaEngine == nil:
+		return errOpusREDNilMediaEngine
+	case interceptorRegistry == nil:
+		return errOpusREDNilInterceptorRegistry
+	case opusPayloadType > 0x7f || redPayloadType > 0x7f:
+		return errOpusREDPayloadTypeOutOfRange
+	case redPayloadType == 0:
+		return errOpusREDPayloadTypeZero
+	case opusPayloadType == redPayloadType:
+		return errOpusREDPayloadTypeCollision
+	default:
+		return nil
+	}
+}
+
+func newOpusREDInterceptorFactories(
+	options []red.SenderOption,
+) (*red.SenderInterceptorFactory, *red.ReceiverInterceptorFactory, error) {
+	sender, err := red.NewSenderInterceptor(options...)
+	if err != nil {
+		return nil, nil, err
+	}
+	receiver, err := red.NewReceiverInterceptor()
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return sender, receiver, nil
+}
+
+func registerOpusREDCodec(mediaEngine *MediaEngine, opusPayloadType, redPayloadType PayloadType) error {
+	mediaEngine.mu.Lock()
+	defer mediaEngine.mu.Unlock()
+
+	opusIndex := -1
+	for i, codec := range mediaEngine.audioCodecs {
+		if codec.PayloadType == redPayloadType {
+			return ErrCodecAlreadyRegistered
+		}
+		if codec.PayloadType == opusPayloadType && strings.EqualFold(codec.MimeType, MimeTypeOpus) {
+			opusIndex = i
+		}
+	}
+	if opusIndex == -1 {
+		return ErrCodecNotFound
+	}
+
+	redCodec := RTPCodecParameters{
+		RTPCodecCapability: RTPCodecCapability{
+			MimeType:    MimeTypeRED,
+			ClockRate:   48000,
+			Channels:    2,
+			SDPFmtpLine: fmt.Sprintf("%d/%d", opusPayloadType, opusPayloadType),
+		},
+		PayloadType: redPayloadType,
+		statsID:     fmt.Sprintf("RTPCodec-%d", time.Now().UnixNano()),
+	}
+	mediaEngine.audioCodecs = insertCodec(mediaEngine.audioCodecs, redCodec, opusIndex)
+
+	return nil
+}
+
+// ConfigureOpusRED registers an audio/red codec associated with an existing
+// Opus codec and installs transparent RFC 2198 sender and receiver interceptors.
+//
+// Register codecs and interceptors before creating a PeerConnection, using the
+// same MediaEngine and interceptor.Registry throughout. The registration order is:
+//
+//  1. RegisterDefaultInterceptors, or custom network observers such as reports,
+//     stats, NACK, and TWCC feedback.
+//  2. ConfigureOpusRED.
+//  3. ConfigureTWCCHeaderExtensionSender and any other RTP header writers.
+//
+// Later registrations wrap earlier ones. On outgoing RTP, header writers run
+// before RED encodes the packet, so its packet-size limit includes their header
+// extensions. Network observers see the wire RED packets on both send and receive.
+//
+// Applications continue to read and write ordinary Opus RTP packets.
+func ConfigureOpusRED(
+	opusPayloadType PayloadType,
+	redPayloadType PayloadType,
+	mediaEngine *MediaEngine,
+	interceptorRegistry *interceptor.Registry,
+	options ...red.SenderOption,
+) error {
+	if err := validateOpusREDConfiguration(
+		opusPayloadType,
+		redPayloadType,
+		mediaEngine,
+		interceptorRegistry,
+	); err != nil {
+		return err
+	}
+
+	sender, receiver, err := newOpusREDInterceptorFactories(options)
+	if err != nil {
+		return err
+	}
+	if err = registerOpusREDCodec(mediaEngine, opusPayloadType, redPayloadType); err != nil {
+		return err
+	}
+
+	interceptorRegistry.Add(sender)
+	interceptorRegistry.Add(receiver)
 
 	return nil
 }
