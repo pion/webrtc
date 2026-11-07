@@ -6,6 +6,10 @@
 package webrtc
 
 import (
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -875,12 +879,30 @@ func getSctpTransportStats(t *testing.T, report StatsReport) SCTPTransportStats 
 	return transportStats
 }
 
+func assertRemoteCertificateStats(
+	t *testing.T,
+	report StatsReport, transportStats TransportStats,
+	peerReport StatsReport, peerTransportStats TransportStats,
+) {
+	t.Helper()
+
+	remote, ok := report[transportStats.RemoteCertificateID].(CertificateStats)
+	require.True(t, ok)
+	peerLocal, ok := peerReport[peerTransportStats.LocalCertificateID].(CertificateStats)
+	require.True(t, ok)
+	assert.Equal(t, peerLocal.Fingerprint, remote.Fingerprint)
+	assert.Equal(t, peerLocal.Base64Certificate, remote.Base64Certificate)
+	assert.Empty(t, remote.IssuerCertificateID)
+}
+
 func getCertificateStats(t *testing.T, report StatsReport, certificate *Certificate) CertificateStats {
 	t.Helper()
 
 	certificateStats, ok := report.GetCertificateStats(certificate)
 	assert.True(t, ok)
 	assert.Equal(t, certificateStats.Type, StatsTypeCertificate)
+	assert.Equal(t, base64.StdEncoding.EncodeToString(certificate.x509Cert.Raw), certificateStats.Base64Certificate)
+	assert.Empty(t, certificateStats.IssuerCertificateID)
 
 	return certificateStats
 }
@@ -1256,6 +1278,8 @@ func TestPeerConnection_GetStats(t *testing.T) { //nolint:cyclop // involves mul
 	offerTransportStats := getTransportStats(t, reportPCOffer, offerPC.dtlsTransport)
 	assert.GreaterOrEqual(t, offerTransportStats.BytesSent, answerTransportStats.BytesReceived)
 	assert.GreaterOrEqual(t, answerTransportStats.BytesSent, offerTransportStats.BytesReceived)
+	assertRemoteCertificateStats(t, reportPCOffer, offerTransportStats, reportPCAnswer, answerTransportStats)
+	assertRemoteCertificateStats(t, reportPCAnswer, answerTransportStats, reportPCOffer, offerTransportStats)
 
 	answerSCTPTransportStats := getSctpTransportStats(t, reportPCAnswer)
 	offerSCTPTransportStats := getSctpTransportStats(t, reportPCOffer)
@@ -1267,6 +1291,27 @@ func TestPeerConnection_GetStats(t *testing.T) { //nolint:cyclop // involves mul
 	for i := range certificates {
 		assert.NotEmpty(t, getCertificateStats(t, reportPCOffer, &certificates[i]))
 	}
+}
+
+func TestPeerConnection_GetStats_OnlyUsedCertificate(t *testing.T) {
+	var certificates []Certificate
+	for range 2 {
+		key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+		require.NoError(t, err)
+		certificate, err := GenerateCertificate(key)
+		require.NoError(t, err)
+		certificates = append(certificates, *certificate)
+	}
+
+	pc, err := NewPeerConnection(Configuration{Certificates: certificates})
+	require.NoError(t, err)
+	defer func() { assert.NoError(t, pc.Close()) }()
+
+	report := pc.GetStats()
+	transportStats := getTransportStats(t, report, pc.dtlsTransport)
+	assert.Equal(t, getCertificateStats(t, report, &certificates[0]).ID, transportStats.LocalCertificateID)
+	_, ok := report.GetCertificateStats(&certificates[1])
+	assert.False(t, ok)
 }
 
 func TestPeerConnection_GetStats_Closed(t *testing.T) {
