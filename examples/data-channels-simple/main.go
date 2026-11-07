@@ -11,7 +11,7 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/pion/webrtc/v4"
+	"github.com/pion/webrtc/v5"
 )
 
 func main() {

@@ -34,7 +34,7 @@ ffmpeg -f lavfi -t 10 -i "sine=frequency=480" \
 ## Run it
 1. Build the binary:
    ```sh
-   go install github.com/pion/webrtc/v4/examples/play-from-disk-playlist-control@latest
+   go install github.com/pion/webrtc/v5/examples/play-from-disk-playlist-control@latest
    ```
 2. Run it from the directory containing `playlist.ogg` (override port with `-addr` if you like):
    ```sh

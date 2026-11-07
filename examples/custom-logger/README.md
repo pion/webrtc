@@ -29,7 +29,7 @@ Ideal for:
 ### 1. Install the example
 
 ```
-go install github.com/pion/webrtc/v4/examples/custom-logger@latest
+go install github.com/pion/webrtc/v5/examples/custom-logger@latest
 ```
 Make sure  ```$(go env GOPATH)/bin ```  is in your ```PATH```.
 

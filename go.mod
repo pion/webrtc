@@ -1,4 +1,4 @@
-module github.com/pion/webrtc/v4
+module github.com/pion/webrtc/v5
 
 go 1.24.0
 

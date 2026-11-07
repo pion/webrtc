@@ -11,7 +11,7 @@ import (
 	"os"
 
 	"github.com/pion/logging"
-	"github.com/pion/webrtc/v4"
+	"github.com/pion/webrtc/v5"
 )
 
 // Everything below is the Pion WebRTC API! Thanks for using it ❤️.

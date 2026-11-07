@@ -18,8 +18,8 @@ import (
 	"github.com/pion/ice/v4"
 	"github.com/pion/logging"
 	"github.com/pion/transport/v5/packetio"
-	"github.com/pion/webrtc/v4/internal/netconn"
-	"github.com/pion/webrtc/v4/internal/util"
+	"github.com/pion/webrtc/v5/internal/netconn"
+	"github.com/pion/webrtc/v5/internal/util"
 )
 
 const maxPendingTransportPackets = 15
