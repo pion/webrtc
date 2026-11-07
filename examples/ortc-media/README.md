@@ -17,7 +17,7 @@ ffmpeg -i $INPUT_FILE -g 30 -b:v 2M output.ivf
 
 ### Download ortc-media
 ```
-go install github.com/pion/webrtc/v4/examples/ortc-media@latest
+go install github.com/pion/webrtc/v5/examples/ortc-media@latest
 ```
 
 ### Run first client as offerer
