@@ -181,6 +181,9 @@ func (c *Conn) processReadyEvents(conn *dtls.DetachedConn) error {
 			c.ready = true
 			c.notify(nil)
 			c.driveMu.Unlock()
+		case dtls.DetachedEarlyDataReady, dtls.DetachedEarlyDataAccepted, dtls.DetachedEarlyDataRejected:
+			// WebRTC does not use DTLS 0rtt/early data.
+			continue
 		case dtls.DetachedClosed:
 			if event.Err == nil {
 				event.Err = io.EOF
