@@ -248,6 +248,22 @@ func TestRTPReceiver_ReadRTP_SimulcastNoRace(t *testing.T) {
 	}
 	close(lowCh)
 	wg.Wait()
+
+	// Replacing the RID being read must also synchronize its interceptor.
+	wg.Add(1)
+	defer wg.Wait()
+	go func() {
+		defer wg.Done()
+		b := make([]byte, 1500)
+		for range 1000 {
+			_, _, readErr := receiver.readRTP(b, lowTrack)
+			assert.ErrorIs(t, readErr, io.EOF)
+		}
+	}()
+	for ssrc := uint32(4444); ssrc < 5444; ssrc++ {
+		_, err = receiver.receiveForRid("low", params, &interceptor.StreamInfo{SSRC: ssrc}, &streamsForSSRCResult{rtpInterceptor: lowInterceptor}, nil)
+		require.NoError(t, err)
+	}
 }
 
 // TestRTPReceiver_CollectStats_Mapping validates that collectStats maps
@@ -832,4 +848,17 @@ func TestRTPReceiverRTXBufferFactory(t *testing.T) {
 	packet, _, err := receiver.Track().ReadRTP()
 	require.NoError(t, err)
 	assert.Equal(t, uint16(42), packet.SequenceNumber)
+}
+
+func TestRTPReceiverStopPreservesEarlierTrackError(t *testing.T) {
+	stream := &srtp.ReadStreamSRTCP{}
+	want := stream.Close()
+	require.Error(t, want)
+	receiver := &RTPReceiver{
+		received: make(chan any), closedChan: make(chan struct{}),
+		tracks: []trackStreams{{track: &TrackRemote{}, rtcpReadStream: stream}, {track: &TrackRemote{}}},
+	}
+	close(receiver.received)
+	require.ErrorIs(t, receiver.Stop(), want)
+	require.NoError(t, receiver.Stop())
 }

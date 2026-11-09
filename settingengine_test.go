@@ -381,8 +381,8 @@ func TestSetHooks(t *testing.T) {
 	settingEngine.SetDTLSServerHelloMessageHook(func(msg handshake.MessageServerHello) handshake.Message {
 		return &msg
 	})
-	settingEngine.SetDTLSCertificateRequestMessageHook(func(msg handshake.MessageCertificateRequest) handshake.Message {
-		return &msg
+	settingEngine.SetDTLSCertificateRequestMessageHook(func(msg handshake.Message) handshake.Message {
+		return msg
 	})
 
 	assert.NotNil(t, settingEngine.dtls.clientHelloMessageHook, "Failed to set DTLS Client Hello Hook")
@@ -564,7 +564,11 @@ func TestSettingEngine_DTLSSetters(t *testing.T) {
 		return nil
 	})
 
-	assert.True(t, se.dtls.insecureSkipHelloVerify)
+	assert.True(t, *se.dtls.insecureSkipHelloVerify)
+	se.SetDTLSInsecureSkipHelloVerify(false)
+	assert.False(t, *se.dtls.insecureSkipHelloVerify)
+	se.SetDTLSInsecureSkipHelloVerify(true)
+	assert.True(t, *se.dtls.insecureSkipHelloVerify)
 	assert.True(t, se.dtls.disableInsecureSkipVerify)
 	assert.Equal(t, dtls.RequireExtendedMasterSecret, se.dtls.extendedMasterSecret)
 	assert.NotNil(t, se.dtls.clientAuth)

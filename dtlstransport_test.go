@@ -685,8 +685,8 @@ func TestDTLSTransport_toDTLSServerOptions_IncludesOptionalOptions(t *testing.T)
 		{
 			name: "CertificateRequestMessageHook",
 			configure: func(se *SettingEngine) {
-				se.dtls.certificateRequestMessageHook = func(m handshake.MessageCertificateRequest) handshake.Message {
-					return &m
+				se.dtls.certificateRequestMessageHook = func(m handshake.Message) handshake.Message {
+					return m
 				}
 			},
 			wantExtra: 1,
@@ -697,8 +697,8 @@ func TestDTLSTransport_toDTLSServerOptions_IncludesOptionalOptions(t *testing.T)
 				se.dtls.serverHelloMessageHook = func(m handshake.MessageServerHello) handshake.Message {
 					return &m
 				}
-				se.dtls.certificateRequestMessageHook = func(m handshake.MessageCertificateRequest) handshake.Message {
-					return &m
+				se.dtls.certificateRequestMessageHook = func(m handshake.Message) handshake.Message {
+					return m
 				}
 			},
 			wantExtra: 2,
