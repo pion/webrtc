@@ -43,6 +43,7 @@ type DTLSTransport struct {
 	remoteCertificate     []byte
 	state                 DTLSTransportState
 	srtpProtectionProfile srtp.ProtectionProfile
+	srtpProfileErr        error            // why no SRTP profile was negotiated, if none was
 	localCryptexMode      srtp.CryptexMode // outbound (send) Cryptex mode
 	remoteCryptexMode     srtp.CryptexMode // inbound (receive) Cryptex mode
 
@@ -228,6 +229,10 @@ func (t *DTLSTransport) wantSRTP() error {
 
 // startSRTP requires the caller holds the lock.
 func (t *DTLSTransport) startSRTP() error { //nolint:cyclop
+	if t.srtpProfileErr != nil {
+		return t.srtpProfileErr
+	}
+
 	srtpConfig := &srtp.Config{
 		Profile:       t.srtpProtectionProfile,
 		BufferFactory: t.api.settingEngine.BufferFactory,
@@ -605,18 +610,22 @@ func (t *DTLSTransport) handshakeDTLS(dtlsConn *dtls.Conn) error {
 }
 
 func (t *DTLSTransport) completeStart(dtlsConn *dtls.Conn) error {
-	srtpProtectionProfile, err := srtpProtectionProfileFromDTLSConn(dtlsConn)
+	srtpProtectionProfile, srtpProfileErr := srtpProtectionProfileFromDTLSConn(dtlsConn)
 
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
-	if err != nil {
+	// A peer may decline the use_srtp extension (RFC 5764 Section 4.1.1). Data
+	// channels need no SRTP, so the transport still connects, as libwebrtc's
+	// does; only media requires a negotiated profile.
+	if srtpProfileErr != nil && t.srtpWanted {
 		t.onStateChange(DTLSTransportStateFailed)
 
-		return err
+		return srtpProfileErr
 	}
 
 	t.srtpProtectionProfile = srtpProtectionProfile
+	t.srtpProfileErr = srtpProfileErr
 	t.conn = dtlsConn
 	t.onStateChange(DTLSTransportStateConnected)
 
@@ -856,7 +865,9 @@ func (t *DTLSTransport) collectStats(collector *statsReportCollector) {
 	if t.conn != nil {
 		// Pion WebRTC@v4 only negotiates DTLS 1.2.
 		stats.TLSVersion = "FEFD"
-		stats.SRTPCipher = t.srtpProtectionProfile.String()
+		if t.srtpProfileErr == nil {
+			stats.SRTPCipher = t.srtpProtectionProfile.String()
+		}
 		if state, ok := t.conn.ConnectionState(); ok {
 			stats.DTLSCipher = dtls.CipherSuiteName(state.CipherSuiteID)
 		}
