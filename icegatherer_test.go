@@ -18,10 +18,10 @@ import (
 
 	"github.com/pion/ice/v5"
 	"github.com/pion/logging"
-	"github.com/pion/stun/v4"
+	"github.com/pion/stun/v5"
 	"github.com/pion/transport/v5/test"
 	"github.com/pion/transport/v5/vnet"
-	"github.com/pion/turn/v5"
+	"github.com/pion/turn/v6"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
