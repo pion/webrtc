@@ -4,7 +4,7 @@ go 1.24.0
 
 require (
 	github.com/pion/datachannel v1.6.3
-	github.com/pion/dtls/v4 v4.0.0-rc.3
+	github.com/pion/dtls/v4 v4.0.1
 	github.com/pion/format v0.0.1
 	github.com/pion/ice/v5 v5.0.0-rc.7
 	github.com/pion/interceptor v0.1.51
@@ -16,7 +16,7 @@ require (
 	github.com/pion/sdp/v3 v3.0.20
 	github.com/pion/srtp/v3 v3.1.3
 	github.com/pion/stun/v4 v4.0.1
-	github.com/pion/transport/v5 v5.1.2
+	github.com/pion/transport/v5 v5.1.4
 	github.com/pion/turn/v5 v5.1.3
 	github.com/sclevine/agouti v3.0.0+incompatible
 	github.com/stretchr/testify v1.12.1

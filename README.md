@@ -30,8 +30,6 @@ We would love your feedback! Please create GitHub issues or Join the [Discord](h
 -----
 
 ### Usage
-[Go Modules](https://blog.golang.org/using-go-modules) are mandatory for using Pion WebRTC. So make sure you set `export GO111MODULE=on`, and explicitly specify `/v4` (or an earlier version) when importing.
-
 
 **[example applications](examples/README.md)** contains code samples of common things people build with Pion WebRTC.
 

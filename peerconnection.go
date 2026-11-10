@@ -1465,6 +1465,9 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error {
 			}
 			if transceiver != nil {
 				transceiver.setCurrentRemoteDirection(direction)
+				if err = transceiver.updateCodecPreferencesFromRemoteDescription(media); err != nil {
+					return err
+				}
 			}
 
 			switch {
@@ -1483,7 +1486,9 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error {
 
 				transceiver = newRTPTransceiver(receiver, nil, localDirection, kind, pc.api)
 				transceiver.setCurrentRemoteDirection(direction)
-				transceiver.setCodecPreferencesFromRemoteDescription(media)
+				if err = transceiver.setCodecPreferencesFromRemoteDescription(media); err != nil {
+					return err
+				}
 				pc.mu.Lock()
 				pc.addRTPTransceiver(transceiver)
 				pc.mu.Unlock()
