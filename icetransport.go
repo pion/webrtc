@@ -263,6 +263,10 @@ func (t *ICETransport) stop(shouldGracefullyClose bool) error {
 	gatherer := t.gatherer
 	t.lock.Unlock()
 
+	if gatherer != nil {
+		gatherer.retainFinalStats()
+	}
+
 	if conn != nil {
 		var closeErrs []error
 		if shouldGracefullyClose && gatherer != nil {
