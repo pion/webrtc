@@ -33,7 +33,7 @@ import (
 	"github.com/pion/srtp/v3"
 	"github.com/pion/transport/v5/test"
 	"github.com/pion/transport/v5/vnet"
-	"github.com/pion/turn/v5"
+	"github.com/pion/turn/v6"
 	"github.com/pion/webrtc/v5/internal/util"
 	"github.com/pion/webrtc/v5/pkg/rtcerr"
 	"github.com/stretchr/testify/assert"

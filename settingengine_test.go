@@ -19,7 +19,7 @@ import (
 	"github.com/pion/dtls/v4/pkg/crypto/elliptic"
 	"github.com/pion/dtls/v4/pkg/protocol/handshake"
 	"github.com/pion/ice/v5"
-	"github.com/pion/stun/v4"
+	"github.com/pion/stun/v5"
 	"github.com/pion/transport/v5/test"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/net/proxy"
