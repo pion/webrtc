@@ -759,6 +759,33 @@ func TestMatch(t *testing.T) {
 	}
 }
 
+func TestH264EquivalentSubprofiles(t *testing.T) {
+	for _, test := range []struct {
+		a, b string
+		want bool
+	}{
+		{"42e01f", "42c02a", true},
+		{"42e01f", "4d801f", true},
+		{"42e01f", "58c01f", true},
+		{"42001f", "58801f", true},
+		{"42001f", "42a01f", true},
+		{"4d001f", "4d501f", true},
+		{"58001f", "58301f", true},
+		{"42e01f", "42001f", false},
+		{"42e01f", "4d001f", false},
+		{"42e01f", "640c1f", false},
+		{"64001f", "640c1f", false},
+		{"42e01f", "42e11f", false},
+	} {
+		t.Run(test.a+"/"+test.b, func(t *testing.T) {
+			a := Parse("video/h264", 90000, 0, "packetization-mode=1;profile-level-id="+test.a)
+			b := Parse("video/h264", 90000, 0, "packetization-mode=1;profile-level-id="+test.b)
+			assert.Equal(t, test.want, a.Match(b))
+			assert.Equal(t, test.want, b.Match(a))
+		})
+	}
+}
+
 func TestDefaults(t *testing.T) {
 	for _, ca := range []struct {
 		mimeType  string
