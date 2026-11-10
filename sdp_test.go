@@ -1524,7 +1524,13 @@ func TestSctpInit(t *testing.T) {
 	t.Run("base64-encoded sctp-init is valid", func(t *testing.T) {
 		s := &sdp.SessionDescription{
 			MediaDescriptions: []*sdp.MediaDescription{
-				{Attributes: []sdp.Attribute{{Key: "sctp-init", Value: "Q29va2llTW9uc3Rlcg=="}}},
+				{
+					MediaName: sdp.MediaName{
+						Protos:  []string{"UDP", "DTLS", "SCTP"},
+						Formats: []string{"webrtc-datachannel"},
+					},
+					Attributes: []sdp.Attribute{{Key: "sctp-init", Value: "Q29va2llTW9uc3Rlcg=="}},
+				},
 			},
 		}
 		init, err := getSctpInit(s.MediaDescriptions[0])
@@ -1534,12 +1540,37 @@ func TestSctpInit(t *testing.T) {
 	t.Run("Not base64-encoded sctp-init is rejected", func(t *testing.T) {
 		s := &sdp.SessionDescription{
 			MediaDescriptions: []*sdp.MediaDescription{
-				{Attributes: []sdp.Attribute{{Key: "sctp-init", Value: "*"}}},
+				{
+					MediaName: sdp.MediaName{
+						Protos:  []string{"UDP", "DTLS", "SCTP"},
+						Formats: []string{"webrtc-datachannel"},
+					},
+					Attributes: []sdp.Attribute{{Key: "sctp-init", Value: "*"}},
+				},
 			},
 		}
 		_, err := getSctpInit(s.MediaDescriptions[0])
 		var corruptInputError base64.CorruptInputError
 		assert.ErrorAs(t, err, &corruptInputError)
+	})
+	t.Run("sctp-init is ignored with sctpmap", func(t *testing.T) {
+		sessionDesc := &sdp.SessionDescription{
+			MediaDescriptions: []*sdp.MediaDescription{
+				{
+					MediaName: sdp.MediaName{
+						Protos:  []string{"DTLS", "SCTP"},
+						Formats: []string{"5000"},
+					},
+					Attributes: []sdp.Attribute{
+						{Key: "sctpmap", Value: "5000 webrtc-datachannel 1024"},
+						{Key: "sctp-init", Value: "Q29va2llTW9uc3Rlcg=="},
+					},
+				},
+			},
+		}
+		init, err := getSctpInit(sessionDesc.MediaDescriptions[0])
+		assert.NoError(t, err)
+		assert.Nil(t, init)
 	})
 }
 
