@@ -4,6 +4,8 @@
 package samplebuilder
 
 import (
+	"bytes"
+	"errors"
 	"fmt"
 	"runtime"
 	"slices"
@@ -15,6 +17,7 @@ import (
 	"github.com/pion/rtp/codecs"
 	"github.com/pion/webrtc/v5/pkg/media"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 type sampleBuilderTest struct {
@@ -232,6 +235,7 @@ func TestSampleBuilder(t *testing.T) {
 			},
 			samples: []*media.Sample{
 				{Data: []byte{0x04, 0x05}, Duration: time.Second * time.Duration(2), PacketTimestamp: 4000, PrevDroppedPackets: 13},
+				{Data: []byte{0x04}, Duration: time.Second, PacketTimestamp: 7000, PrevDroppedPackets: 1},
 			},
 			withHeadChecker:  true,
 			headBytes:        []byte{0x04},
@@ -262,6 +266,7 @@ func TestSampleBuilder(t *testing.T) {
 			headBytes:       []byte{1},
 			samples: []*media.Sample{
 				{Data: []byte{1, 2, 3}, Duration: 0, PacketTimestamp: 1, PrevDroppedPackets: 0}, // first sample
+				{Data: []byte{1, 7}, Duration: time.Second, PacketTimestamp: 3, PrevDroppedPackets: 2},
 			},
 			maxLate:          50,
 			maxLateTimestamp: 2000,
@@ -287,6 +292,7 @@ func TestSampleBuilder(t *testing.T) {
 			headBytes:       []byte{1},
 			samples: []*media.Sample{
 				{Data: []byte{1, 2}, Duration: 0, PacketTimestamp: 1, PrevDroppedPackets: 0}, // 1st sample
+				{Data: []byte{1}, Duration: time.Second, PacketTimestamp: 2, PrevDroppedPackets: 2},
 			},
 			maxLate:          50,
 			maxLateTimestamp: 2000,
@@ -584,23 +590,29 @@ func TestSampleBuilder_Flush(t *testing.T) {
 }
 
 func TestSampleBuilder_H264(t *testing.T) {
-	for _, mtu := range []uint16{4, 1200} { // Fragmented and single-packet NAL units.
-		t.Run(fmt.Sprint(mtu), func(t *testing.T) {
-			sb := New(50, &codecs.H264Packet{}, 90000)
-			payloads := (&codecs.H264Payloader{}).Payload(mtu, []byte{0x65, 1, 2, 3, 4})
-			for i, payload := range payloads {
-				sb.Push(&rtp.Packet{
-					Header: rtp.Header{
-						SequenceNumber: uint16(i), //nolint:gosec // The fixture produces at most two packets.
-						Timestamp:      1,
-						Marker:         i == len(payloads)-1,
-					},
-					Payload: payload,
-				})
-			}
-			sb.Flush()
-			assert.Equal(t, &media.Sample{Data: []byte{0, 0, 0, 1, 0x65, 1, 2, 3, 4}, PacketTimestamp: 1}, sb.Pop())
-		})
+	for _, units := range []int{1, 3} {
+		for _, mtu := range []uint16{4, 1200} { // Fragmented and single-packet NAL units.
+			t.Run(fmt.Sprintf("units%d_mtu%d", units, mtu), func(t *testing.T) {
+				sb := New(50, &codecs.H264Packet{}, 90000)
+				data := bytes.Repeat([]byte{0, 0, 0, 1, 0x65, 1, 2, 3, 4}, units)
+				payloads := (&codecs.H264Payloader{}).Payload(mtu, data)
+				for range 2 { // Reuse the builder after Flush.
+					for i, payload := range payloads {
+						sb.Push(&rtp.Packet{
+							Header: rtp.Header{
+								SequenceNumber: uint16(i), //nolint:gosec // The fixture produces at most six packets.
+								Timestamp:      1,
+								Marker:         i == len(payloads)-1,
+							},
+							Payload: payload,
+						})
+					}
+					sb.Flush()
+					assert.Equal(t, &media.Sample{Data: data, PacketTimestamp: 1}, sb.Pop())
+					assert.Nil(t, sb.Pop(), "consumed NAL units must not be emitted again")
+				}
+			})
+		}
 	}
 }
 
@@ -612,6 +624,127 @@ func TestSampleBuilder_ZeroSampleRate(t *testing.T) {
 
 	sb.Flush()
 	assert.Equal(t, &media.Sample{Data: []byte{0x02}, PacketTimestamp: 2}, sb.Pop())
+}
+
+func TestSampleBuilderDurationAcrossSequenceWrap(t *testing.T) {
+	for _, sequence := range []uint16{1, 65533, 65534, 65535} {
+		for _, timestamp := range []uint32{1000, 0xfffffe1f} {
+			t.Run(fmt.Sprintf("seq%d_ts%d", sequence, timestamp), func(t *testing.T) {
+				builder := New(50, &fakeDepacketizer{}, 48000)
+				builder.Push(&rtp.Packet{
+					Header: rtp.Header{SequenceNumber: sequence, Timestamp: timestamp}, Payload: []byte{1},
+				})
+				builder.Push(&rtp.Packet{
+					Header: rtp.Header{SequenceNumber: sequence + 1, Timestamp: timestamp, Marker: true}, Payload: []byte{2},
+				})
+				builder.Push(&rtp.Packet{
+					Header: rtp.Header{SequenceNumber: sequence + 2, Timestamp: timestamp + 960}, Payload: []byte{3},
+				})
+				assert.Equal(t, &media.Sample{
+					Data: []byte{1, 2}, PacketTimestamp: timestamp, Duration: 20 * time.Millisecond,
+				}, builder.Pop())
+			})
+		}
+	}
+}
+
+func TestSampleBuilderReleaseWithLossAndReordering(t *testing.T) {
+	released := make(map[*rtp.Packet]int)
+	builder := New(12, &fakeDepacketizer{headChecker: true, headBytes: []byte{1}}, 48000,
+		WithRTPHeaders(true), WithPacketReleaseHandler(func(packet *rtp.Packet) {
+			released[packet]++
+			clear(packet.Payload)
+			packet.Timestamp = 0
+		}))
+	sequence := uint16(65530)
+	want := make(map[uint32][]byte)
+	var packets []*rtp.Packet
+	for frame := range uint32(20) {
+		timestamp := frame * 960
+		var data []byte
+		for fragment := range uint16(3) {
+			payload := bytes.Repeat([]byte{byte(fragment + 1)}, 1000)
+			data = append(data, payload...)
+			packet := &rtp.Packet{
+				Header: rtp.Header{SequenceNumber: sequence, Timestamp: timestamp, Marker: fragment == 2}, Payload: payload,
+			}
+			sequence++
+			if frame%7 == 3 && fragment == 1 {
+				continue
+			}
+			packets = append(packets, packet)
+		}
+		if frame%7 != 3 {
+			want[timestamp] = data
+		}
+	}
+	// Reverse pairs to exercise reordering across frame and sequence boundaries.
+	for index := 0; index+1 < len(packets); index += 2 {
+		packets[index], packets[index+1] = packets[index+1], packets[index]
+	}
+	for _, packet := range packets {
+		builder.Push(packet)
+	}
+	builder.Flush()
+	for sample := builder.Pop(); sample != nil; sample = builder.Pop() {
+		data, exists := want[sample.PacketTimestamp]
+		require.True(t, exists, "unexpected or duplicate frame %d", sample.PacketTimestamp)
+		require.Equal(t, data, sample.Data, "released packet storage must not corrupt samples")
+		require.Len(t, sample.RTPHeaders, 3)
+		require.Equal(t, sample.PacketTimestamp, sample.RTPHeaders[0].Timestamp)
+		require.Equal(t, sample.PacketTimestamp, sample.RTPHeaders[1].Timestamp)
+		require.Equal(t, sample.PacketTimestamp, sample.RTPHeaders[2].Timestamp)
+		delete(want, sample.PacketTimestamp)
+	}
+	require.Zero(t, len(want), "all complete frames should be emitted")
+	for _, packet := range packets {
+		require.Equal(t, 1, released[packet], "each retained packet must be released exactly once")
+	}
+}
+
+var errRejectedFragment = errors.New("invalid sample fragment")
+
+type rejectingDepacketizer struct{ fakeDepacketizer }
+
+func (f *rejectingDepacketizer) Unmarshal(payload []byte) ([]byte, error) {
+	if payload[0] == 0xee {
+		return nil, errRejectedFragment
+	}
+
+	return payload, nil
+}
+
+func TestSampleBuilderInvalidFragmentThenValidSample(t *testing.T) {
+	for _, flush := range []bool{false, true} {
+		for _, badFragment := range []int{0, 1} {
+			t.Run(fmt.Sprintf("flush%t_fragment%d", flush, badFragment), func(t *testing.T) {
+				released := 0
+				builder := New(50, &rejectingDepacketizer{}, 1,
+					WithPacketReleaseHandler(func(*rtp.Packet) { released++ }))
+				packets := []*rtp.Packet{
+					{Header: rtp.Header{SequenceNumber: 1000, Timestamp: 1}, Payload: []byte{1}},
+					{Header: rtp.Header{SequenceNumber: 1001, Timestamp: 1, Marker: true}, Payload: []byte{1}},
+					{Header: rtp.Header{SequenceNumber: 1002, Timestamp: 2, Marker: true}, Payload: []byte{1}},
+					{Header: rtp.Header{SequenceNumber: 1003, Timestamp: 3}, Payload: []byte{1}},
+				}
+				packets[badFragment].Payload[0] = 0xee
+				for _, packet := range packets {
+					builder.Push(packet)
+				}
+				if flush {
+					builder.Flush()
+				}
+				sample := builder.Pop()
+				require.NotNil(t, sample)
+				require.Equal(t, uint32(2), sample.PacketTimestamp)
+				require.Equal(t, uint16(2), sample.PrevDroppedPackets)
+				require.Equal(t, []byte{1}, sample.Data)
+				require.Nil(t, builder.Pop())
+				builder.Flush()
+				require.Equal(t, 4, released)
+			})
+		}
+	}
 }
 
 func BenchmarkSampleBuilderSequential(b *testing.B) {
