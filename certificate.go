@@ -156,29 +156,27 @@ func CertificateFromX509(privateKey crypto.PrivateKey, certificate *x509.Certifi
 	return Certificate{privateKey, certificate, fmt.Sprintf("certificate-%d", time.Now().UnixNano())}
 }
 
-func (c Certificate) collectStats(report *statsReportCollector) error {
-	report.Collecting()
-
-	fingerPrintAlgo, err := c.GetFingerprints()
+func newCertificateStats(id string, cert *x509.Certificate) (CertificateStats, error) {
+	algorithm, err := fingerprint.StringFromHash(crypto.SHA256)
 	if err != nil {
-		return err
+		return CertificateStats{}, err
+	}
+	fp, err := fingerprint.Fingerprint(cert, crypto.SHA256)
+	if err != nil {
+		return CertificateStats{}, err
+	}
+	if id == "" {
+		id = "certificate-" + fp
 	}
 
-	base64Certificate := base64.RawURLEncoding.EncodeToString(c.x509Cert.Raw)
-
-	stats := CertificateStats{
+	return CertificateStats{
 		Timestamp:            statsTimestampFrom(time.Now()),
 		Type:                 StatsTypeCertificate,
-		ID:                   c.statsID,
-		Fingerprint:          fingerPrintAlgo[0].Value,
-		FingerprintAlgorithm: fingerPrintAlgo[0].Algorithm,
-		Base64Certificate:    base64Certificate,
-		IssuerCertificateID:  c.x509Cert.Issuer.String(),
-	}
-
-	report.Collect(stats.ID, stats)
-
-	return nil
+		ID:                   id,
+		Fingerprint:          fp,
+		FingerprintAlgorithm: algorithm,
+		Base64Certificate:    base64.StdEncoding.EncodeToString(cert.Raw),
+	}, nil
 }
 
 // CertificateFromPEM creates a fresh certificate based on a string containing

@@ -3136,12 +3136,6 @@ func (pc *PeerConnection) GetStats() StatsReport {
 
 	statsCollector.Collect(stats.ID, stats)
 
-	certificates := pc.configuration.Certificates
-	for _, certificate := range certificates {
-		if err := certificate.collectStats(statsCollector); err != nil {
-			continue
-		}
-	}
 	pc.mu.Unlock()
 
 	receivers := pc.GetReceivers()

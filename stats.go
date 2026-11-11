@@ -1310,11 +1310,11 @@ type TransportStats struct {
 
 	// LocalCertificateID is the ID of the CertificateStats for the local certificate.
 	// Present only if DTLS is negotiated.
-	LocalCertificateID string `json:"localCertificateId"`
+	LocalCertificateID string `json:"localCertificateId,omitempty"`
 
 	// RemoteCertificateID is the ID of the CertificateStats for the remote certificate.
 	// Present only if DTLS is negotiated.
-	RemoteCertificateID string `json:"remoteCertificateId"`
+	RemoteCertificateID string `json:"remoteCertificateId,omitempty"`
 
 	// TLSVersion is the negotiated DTLS version as four uppercase hexadecimal digits.
 	// It is omitted from JSON until DTLS negotiation completes.
@@ -1702,7 +1702,7 @@ type CertificateStats struct {
 	// IssuerCertificateID refers to the stats object that contains the next certificate
 	// in the certificate chain. If the current certificate is at the end of the chain
 	// (i.e. a self-signed certificate), this will not be set.
-	IssuerCertificateID string `json:"issuerCertificateId"`
+	IssuerCertificateID string `json:"issuerCertificateId,omitempty"`
 }
 
 func (s CertificateStats) statsMarker() {}

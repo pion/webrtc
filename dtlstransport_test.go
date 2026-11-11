@@ -8,12 +8,18 @@ package webrtc
 import (
 	"bytes"
 	"context"
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
 	"crypto/tls"
 	"crypto/x509"
+	"crypto/x509/pkix"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"math/big"
 	"net"
 	"regexp"
 	"testing"
@@ -802,4 +808,40 @@ func TestDTLSTransport_StartContextInterruptedWhileWaitingForICE(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestDTLSTransport_Stats_RemoteCertificateChain(t *testing.T) {
+	caKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	require.NoError(t, err)
+	caTemplate := &x509.Certificate{
+		SerialNumber:          big.NewInt(1),
+		Subject:               pkix.Name{CommonName: "ca"},
+		NotAfter:              time.Now().Add(time.Hour),
+		IsCA:                  true,
+		BasicConstraintsValid: true,
+	}
+	caDER, err := x509.CreateCertificate(rand.Reader, caTemplate, caTemplate, &caKey.PublicKey, caKey)
+	require.NoError(t, err)
+
+	leafKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	require.NoError(t, err)
+	leafTemplate := &x509.Certificate{
+		SerialNumber: big.NewInt(2),
+		Subject:      pkix.Name{CommonName: "leaf"},
+		NotAfter:     time.Now().Add(time.Hour),
+	}
+	leafDER, err := x509.CreateCertificate(rand.Reader, leafTemplate, caTemplate, &leafKey.PublicKey, caKey)
+	require.NoError(t, err)
+
+	transportStats, certificateStats := (&DTLSTransport{remoteCertificates: [][]byte{leafDER, caDER}}).stats()
+	require.Len(t, certificateStats, 2)
+	certificates := map[string]CertificateStats{}
+	for _, c := range certificateStats {
+		certificates[c.ID] = c
+	}
+	leaf := certificates[transportStats.RemoteCertificateID]
+	assert.Equal(t, base64.StdEncoding.EncodeToString(leafDER), leaf.Base64Certificate)
+	ca := certificates[leaf.IssuerCertificateID]
+	assert.Equal(t, base64.StdEncoding.EncodeToString(caDER), ca.Base64Certificate)
+	assert.Empty(t, ca.IssuerCertificateID)
 }
