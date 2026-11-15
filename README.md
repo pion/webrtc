@@ -21,9 +21,9 @@
 
 ### New Release
 
-Pion WebRTC v4.0.0 has been released! See the [release notes](https://github.com/pion/webrtc/wiki/Release-WebRTC@v4.0.0) to learn about new features and breaking changes.
+Pion WebRTC v5 is in development! See the [release notes](https://github.com/pion/webrtc/wiki/Release-WebRTC@v5.0.0) to learn about new features and breaking changes.
 
-If you aren't able to upgrade yet check the [tags](https://github.com/pion/webrtc/tags) for the latest `v3` release.
+If you aren't able to upgrade yet check the [tags](https://github.com/pion/webrtc/tags) for the latest `v4` release.
 
 We would love your feedback! Please create GitHub issues or Join the [Discord](https://discord.gg/PngbdqpFbt) to follow development and speak with the maintainers.
 
