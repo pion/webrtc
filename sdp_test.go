@@ -10,16 +10,181 @@ import (
 	"crypto/elliptic"
 	"crypto/rand"
 	"encoding/base64"
+	"fmt"
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/pion/ice/v5"
 	"github.com/pion/logging"
 	"github.com/pion/sdp/v3"
 	"github.com/pion/transport/v5/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestAddCandidatesToMediaDescriptions(t *testing.T) {
+	candidates := []ICECandidate{
+		{Foundation: "host4", Address: "192.0.2.1", Port: 5000, Protocol: ICEProtocolUDP, Typ: ICECandidateTypeHost, Component: 1},
+		{Foundation: "host6", Address: "2001:db8::1", Port: 5001, Protocol: ICEProtocolUDP, Typ: ICECandidateTypeHost, Component: 1},
+		{Foundation: "hosttcp", Address: "192.0.2.3", Port: 5002, Protocol: ICEProtocolTCP, Typ: ICECandidateTypeHost, Component: 1, TCPType: "passive"},
+		{Foundation: "turn", Address: "192.0.2.2", Port: 5003, Protocol: ICEProtocolUDP, Typ: ICECandidateTypeRelay, Component: 1},
+	}
+	for _, testCase := range []struct {
+		name       string
+		media      string
+		mux        bool
+		policy     RTCPMuxPolicy
+		components []uint16
+	}{
+		{name: "audio mux", media: string(MediaKindAudio), mux: true, components: []uint16{1}},
+		{name: "video mux", media: string(MediaKindVideo), mux: true, components: []uint16{1}},
+		{name: "data channel", media: mediaSectionApplication, components: []uint16{1}},
+		{name: "negotiate mux", media: string(MediaKindVideo), mux: true, policy: RTCPMuxPolicyNegotiate, components: []uint16{1, 2}},
+		{name: "separate RTCP", media: string(MediaKindVideo), components: []uint16{1, 2}},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			media := &sdp.MediaDescription{MediaName: sdp.MediaName{Media: testCase.media}}
+			if testCase.mux {
+				media.WithPropertyAttribute(sdp.AttrKeyRTCPMux)
+			}
+			for _, state := range []ICEGatheringState{ICEGatheringStateGathering, ICEGatheringStateComplete, ICEGatheringStateComplete} {
+				require.NoError(t, addCandidatesToMediaDescriptions(candidates, media, state, testCase.policy))
+				var components []uint16
+				endOfCandidates := 0
+				for _, attribute := range media.Attributes {
+					switch attribute.Key {
+					case sdp.AttrKeyCandidate:
+						candidate, err := ice.UnmarshalCandidate(attribute.Value)
+						require.NoError(t, err)
+						components = append(components, candidate.Component())
+					case sdp.AttrKeyEndOfCandidates:
+						endOfCandidates++
+					}
+				}
+				var expected []uint16
+				for range candidates {
+					expected = append(expected, testCase.components...)
+				}
+				assert.Equal(t, expected, components)
+				if state == ICEGatheringStateComplete {
+					assert.Equal(t, 1, endOfCandidates)
+				} else {
+					assert.Zero(t, endOfCandidates)
+				}
+			}
+		})
+	}
+}
+
+func BenchmarkAddCandidatesToMediaDescriptions(b *testing.B) {
+	for _, count := range []int{1, 16} {
+		b.Run(fmt.Sprint(count), func(b *testing.B) {
+			candidates := make([]ICECandidate, count)
+			for i := range candidates {
+				candidates[i] = ICECandidate{
+					Foundation: "benchmark", Address: "192.0.2.1", Port: uint16(5000 + i), //nolint:gosec // Small fixed benchmark input.
+					Protocol: ICEProtocolUDP, Typ: ICECandidateTypeHost, Component: 1,
+				}
+			}
+			b.ReportAllocs()
+			b.ResetTimer()
+			for b.Loop() {
+				media := &sdp.MediaDescription{MediaName: sdp.MediaName{Media: string(MediaKindVideo)}}
+				media.WithPropertyAttribute(sdp.AttrKeyRTCPMux)
+				if err := addCandidatesToMediaDescriptions(candidates, media, ICEGatheringStateComplete, RTCPMuxPolicyRequire); err != nil {
+					b.Fatal(err)
+				}
+			}
+		})
+	}
+}
+
+func TestPeerConnection_CandidateComponents(t *testing.T) {
+	lim := test.TimeOut(10 * time.Second)
+	defer lim.Stop()
+	defer test.CheckRoutines(t)()
+
+	for _, testCase := range []struct {
+		name   string
+		policy RTCPMuxPolicy
+		mux    bool
+	}{
+		{name: "require mux", policy: RTCPMuxPolicyRequire, mux: true},
+		{name: "negotiate mux", policy: RTCPMuxPolicyNegotiate, mux: true},
+		{name: "negotiate without mux", policy: RTCPMuxPolicyNegotiate},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			settings := SettingEngine{}
+			settings.SetNetworkTypes([]NetworkType{NetworkTypeUDP4})
+			settings.SetIncludeLoopbackCandidate(true)
+			api := NewAPI(WithSettingEngine(settings))
+			offerer, err := api.NewPeerConnection(Configuration{RTCPMuxPolicy: testCase.policy})
+			require.NoError(t, err)
+			t.Cleanup(func() { assert.NoError(t, offerer.Close()) })
+			answerer, err := api.NewPeerConnection(Configuration{RTCPMuxPolicy: testCase.policy})
+			require.NoError(t, err)
+			t.Cleanup(func() { assert.NoError(t, answerer.Close()) })
+			_, err = offerer.AddTransceiverFromKind(RTPCodecTypeVideo)
+			require.NoError(t, err)
+
+			checkComponents := func(description *SessionDescription, separateRTCP bool) {
+				t.Helper()
+				require.NotNil(t, description)
+				parsed, parseErr := description.Unmarshal()
+				require.NoError(t, parseErr)
+				require.NotEmpty(t, parsed.MediaDescriptions)
+				var rtpCount, rtcpCount int
+				for _, attribute := range parsed.MediaDescriptions[0].Attributes {
+					if attribute.Key != sdp.AttrKeyCandidate {
+						continue
+					}
+					candidate, candidateErr := ice.UnmarshalCandidate(attribute.Value)
+					require.NoError(t, candidateErr)
+					switch candidate.Component() {
+					case 1:
+						rtpCount++
+					case 2:
+						rtcpCount++
+					default:
+						assert.Fail(t, "unexpected ICE component")
+					}
+				}
+				assert.Positive(t, rtpCount)
+				if separateRTCP {
+					assert.Equal(t, rtpCount, rtcpCount)
+				} else {
+					assert.Zero(t, rtcpCount)
+				}
+			}
+
+			modifyOffer := func(description string) string {
+				if !testCase.mux {
+					return strings.ReplaceAll(description, "a=rtcp-mux\r\n", "")
+				}
+
+				return description
+			}
+			require.NoError(t, signalPairWithOptions(offerer, answerer,
+				withDisableInitialDataChannel(true), withModificationFunc(modifyOffer)))
+			checkComponents(offerer.CurrentLocalDescription(), testCase.policy == RTCPMuxPolicyNegotiate)
+			checkComponents(answerer.CurrentLocalDescription(), !testCase.mux)
+			offer, err := offerer.CreateOffer(nil)
+			require.NoError(t, err)
+			checkComponents(&offer, testCase.policy == RTCPMuxPolicyNegotiate)
+			require.NoError(t, offerer.SetLocalDescription(offer))
+			checkComponents(offerer.PendingLocalDescription(), testCase.policy == RTCPMuxPolicyNegotiate)
+			offer.SDP = modifyOffer(offer.SDP)
+			require.NoError(t, answerer.SetRemoteDescription(offer))
+			answer, err := answerer.CreateAnswer(nil)
+			require.NoError(t, err)
+			checkComponents(&answer, !testCase.mux)
+			require.NoError(t, answerer.SetLocalDescription(answer))
+			checkComponents(answerer.CurrentLocalDescription(), !testCase.mux)
+		})
+	}
+}
 
 func TestExtractFingerprint(t *testing.T) {
 	t.Run("Good Session Fingerprint", func(t *testing.T) {
@@ -792,7 +957,7 @@ func TestMediaDescriptionFingerprints(t *testing.T) {
 			dtlsFingerprints, err := certificate.GetFingerprints()
 			assert.NoError(t, err)
 
-			testSdp, err = populateSDP(testSdp, dtlsFingerprints, SDPMediaDescriptionFingerprints, false, true, engine, sdp.ConnectionRoleActive, []ICECandidate{}, ICEParameters{}, media, ICEGatheringStateNew, nil, 0, false, false)
+			testSdp, err = populateSDP(testSdp, dtlsFingerprints, SDPMediaDescriptionFingerprints, false, true, engine, sdp.ConnectionRoleActive, []ICECandidate{}, ICEParameters{}, media, ICEGatheringStateNew, nil, 0, false, false, RTCPMuxPolicyRequire)
 			assert.NoError(t, err)
 
 			sdparray, err := testSdp.Marshal()
@@ -831,7 +996,10 @@ func TestPopulateSDP(t *testing.T) { //nolint:cyclop
 
 		d := &sdp.SessionDescription{}
 
-		offerSdp, err := populateSDP(d, []DTLSFingerprint{}, se.sdpMediaLevelFingerprints, se.candidates.ICELite, true, me, connectionRoleFromDtlsRole(defaultDtlsRoleOffer), []ICECandidate{}, ICEParameters{}, mediaSections, ICEGatheringStateComplete, nil, se.getSCTPMaxMessageSize(), se.ignoreRidPauseForRecv, false)
+		offerSdp, err := populateSDP(
+			d, []DTLSFingerprint{}, se.sdpMediaLevelFingerprints, se.candidates.ICELite, true, me, connectionRoleFromDtlsRole(defaultDtlsRoleOffer),
+			[]ICECandidate{}, ICEParameters{}, mediaSections, ICEGatheringStateComplete, nil, se.getSCTPMaxMessageSize(), se.ignoreRidPauseForRecv, false, RTCPMuxPolicyRequire,
+		)
 		assert.Nil(t, err)
 
 		// Test contains rid map keys
@@ -877,7 +1045,10 @@ func TestPopulateSDP(t *testing.T) { //nolint:cyclop
 
 		d := &sdp.SessionDescription{}
 
-		offerSdp, err := populateSDP(d, []DTLSFingerprint{}, se.sdpMediaLevelFingerprints, se.candidates.ICELite, true, me, connectionRoleFromDtlsRole(defaultDtlsRoleOffer), []ICECandidate{}, ICEParameters{}, mediaSections, ICEGatheringStateComplete, nil, se.getSCTPMaxMessageSize(), se.ignoreRidPauseForRecv, false)
+		offerSdp, err := populateSDP(
+			d, []DTLSFingerprint{}, se.sdpMediaLevelFingerprints, se.candidates.ICELite, true, me, connectionRoleFromDtlsRole(defaultDtlsRoleOffer),
+			[]ICECandidate{}, ICEParameters{}, mediaSections, ICEGatheringStateComplete, nil, se.getSCTPMaxMessageSize(), se.ignoreRidPauseForRecv, false, RTCPMuxPolicyRequire,
+		)
 		assert.Nil(t, err)
 
 		// Test contains rid map keys
@@ -916,7 +1087,7 @@ func TestPopulateSDP(t *testing.T) { //nolint:cyclop
 
 		d := &sdp.SessionDescription{}
 
-		offerSdp, err := populateSDP(d, []DTLSFingerprint{}, se.sdpMediaLevelFingerprints, se.candidates.ICELite, true, me, connectionRoleFromDtlsRole(defaultDtlsRoleOffer), []ICECandidate{}, ICEParameters{}, mediaSections, ICEGatheringStateComplete, nil, se.getSCTPMaxMessageSize(), false, false)
+		offerSdp, err := populateSDP(d, []DTLSFingerprint{}, se.sdpMediaLevelFingerprints, se.candidates.ICELite, true, me, connectionRoleFromDtlsRole(defaultDtlsRoleOffer), []ICECandidate{}, ICEParameters{}, mediaSections, ICEGatheringStateComplete, nil, se.getSCTPMaxMessageSize(), false, false, RTCPMuxPolicyRequire)
 		assert.Nil(t, err)
 
 		// Test codecs
@@ -957,6 +1128,7 @@ func TestPopulateSDP(t *testing.T) { //nolint:cyclop
 			se.getSCTPMaxMessageSize(),
 			false,
 			false,
+			RTCPMuxPolicyRequire,
 		)
 		assert.Nil(t, err)
 
@@ -991,7 +1163,7 @@ func TestPopulateSDP(t *testing.T) { //nolint:cyclop
 
 		d := &sdp.SessionDescription{}
 
-		offerSdp, err := populateSDP(d, []DTLSFingerprint{}, se.sdpMediaLevelFingerprints, se.candidates.ICELite, true, me, connectionRoleFromDtlsRole(defaultDtlsRoleOffer), []ICECandidate{}, ICEParameters{}, mediaSections, ICEGatheringStateComplete, nil, se.getSCTPMaxMessageSize(), false, false)
+		offerSdp, err := populateSDP(d, []DTLSFingerprint{}, se.sdpMediaLevelFingerprints, se.candidates.ICELite, true, me, connectionRoleFromDtlsRole(defaultDtlsRoleOffer), []ICECandidate{}, ICEParameters{}, mediaSections, ICEGatheringStateComplete, nil, se.getSCTPMaxMessageSize(), false, false, RTCPMuxPolicyRequire)
 		assert.NoError(t, err)
 
 		// Test codecs
@@ -1026,6 +1198,7 @@ func TestPopulateSDP(t *testing.T) { //nolint:cyclop
 			se.getSCTPMaxMessageSize(),
 			false,
 			false,
+			RTCPMuxPolicyRequire,
 		)
 		assert.Nil(t, err)
 
@@ -1057,6 +1230,7 @@ func TestPopulateSDP(t *testing.T) { //nolint:cyclop
 			se.getSCTPMaxMessageSize(),
 			false,
 			false,
+			RTCPMuxPolicyRequire,
 		)
 		assert.Nil(t, err)
 
@@ -1086,7 +1260,7 @@ func TestPopulateSDP(t *testing.T) { //nolint:cyclop
 
 		d := &sdp.SessionDescription{}
 
-		offerSdp, err := populateSDP(d, []DTLSFingerprint{}, se.sdpMediaLevelFingerprints, se.candidates.ICELite, true, me, connectionRoleFromDtlsRole(defaultDtlsRoleOffer), []ICECandidate{}, ICEParameters{}, mediaSections, ICEGatheringStateComplete, nil, se.getSCTPMaxMessageSize(), false, false)
+		offerSdp, err := populateSDP(d, []DTLSFingerprint{}, se.sdpMediaLevelFingerprints, se.candidates.ICELite, true, me, connectionRoleFromDtlsRole(defaultDtlsRoleOffer), []ICECandidate{}, ICEParameters{}, mediaSections, ICEGatheringStateComplete, nil, se.getSCTPMaxMessageSize(), false, false, RTCPMuxPolicyRequire)
 		assert.Nil(t, err)
 
 		bundle, ok := offerSdp.Attribute(sdp.AttrKeyGroup)
@@ -1111,7 +1285,10 @@ func TestPopulateSDP(t *testing.T) { //nolint:cyclop
 		d := &sdp.SessionDescription{}
 
 		matchedBundle := "audio"
-		offerSdp, err := populateSDP(d, []DTLSFingerprint{}, se.sdpMediaLevelFingerprints, se.candidates.ICELite, true, me, connectionRoleFromDtlsRole(defaultDtlsRoleOffer), []ICECandidate{}, ICEParameters{}, mediaSections, ICEGatheringStateComplete, &matchedBundle, se.getSCTPMaxMessageSize(), false, false)
+		offerSdp, err := populateSDP(
+			d, []DTLSFingerprint{}, se.sdpMediaLevelFingerprints, se.candidates.ICELite, true, me, connectionRoleFromDtlsRole(defaultDtlsRoleOffer),
+			[]ICECandidate{}, ICEParameters{}, mediaSections, ICEGatheringStateComplete, &matchedBundle, se.getSCTPMaxMessageSize(), false, false, RTCPMuxPolicyRequire,
+		)
 		assert.Nil(t, err)
 
 		bundle, ok := offerSdp.Attribute(sdp.AttrKeyGroup)
@@ -1138,7 +1315,10 @@ func TestPopulateSDP(t *testing.T) { //nolint:cyclop
 		d := &sdp.SessionDescription{}
 
 		matchedBundle := ""
-		offerSdp, err := populateSDP(d, []DTLSFingerprint{}, se.sdpMediaLevelFingerprints, se.candidates.ICELite, true, me, connectionRoleFromDtlsRole(defaultDtlsRoleOffer), []ICECandidate{}, ICEParameters{}, mediaSections, ICEGatheringStateComplete, &matchedBundle, se.getSCTPMaxMessageSize(), false, false)
+		offerSdp, err := populateSDP(
+			d, []DTLSFingerprint{}, se.sdpMediaLevelFingerprints, se.candidates.ICELite, true, me, connectionRoleFromDtlsRole(defaultDtlsRoleOffer),
+			[]ICECandidate{}, ICEParameters{}, mediaSections, ICEGatheringStateComplete, &matchedBundle, se.getSCTPMaxMessageSize(), false, false, RTCPMuxPolicyRequire,
+		)
 		assert.Nil(t, err)
 
 		_, ok := offerSdp.Attribute(sdp.AttrKeyGroup)
@@ -1156,7 +1336,7 @@ func TestPopulateSDP(t *testing.T) { //nolint:cyclop
 
 		d := &sdp.SessionDescription{}
 
-		offerSdp, err := populateSDP(d, []DTLSFingerprint{}, se.sdpMediaLevelFingerprints, se.candidates.ICELite, true, me, connectionRoleFromDtlsRole(defaultDtlsRoleOffer), []ICECandidate{}, ICEParameters{}, mediaSections, ICEGatheringStateComplete, nil, se.getSCTPMaxMessageSize(), false, false)
+		offerSdp, err := populateSDP(d, []DTLSFingerprint{}, se.sdpMediaLevelFingerprints, se.candidates.ICELite, true, me, connectionRoleFromDtlsRole(defaultDtlsRoleOffer), []ICECandidate{}, ICEParameters{}, mediaSections, ICEGatheringStateComplete, nil, se.getSCTPMaxMessageSize(), false, false, RTCPMuxPolicyRequire)
 		assert.Nil(t, err)
 
 		for _, desc := range offerSdp.MediaDescriptions {
@@ -1177,7 +1357,10 @@ func TestPopulateSDP(t *testing.T) { //nolint:cyclop
 		mediaSections := []mediaSection{{id: "video", transceivers: []*RTPTransceiver{tr}, cryptex: true}}
 
 		d := &sdp.SessionDescription{}
-		offerSdp, err := populateSDP(d, []DTLSFingerprint{}, se.sdpMediaLevelFingerprints, se.candidates.ICELite, true, me, connectionRoleFromDtlsRole(defaultDtlsRoleOffer), []ICECandidate{}, ICEParameters{}, mediaSections, ICEGatheringStateComplete, nil, se.getSCTPMaxMessageSize(), se.ignoreRidPauseForRecv, false)
+		offerSdp, err := populateSDP(
+			d, []DTLSFingerprint{}, se.sdpMediaLevelFingerprints, se.candidates.ICELite, true, me, connectionRoleFromDtlsRole(defaultDtlsRoleOffer),
+			[]ICECandidate{}, ICEParameters{}, mediaSections, ICEGatheringStateComplete, nil, se.getSCTPMaxMessageSize(), se.ignoreRidPauseForRecv, false, RTCPMuxPolicyRequire,
+		)
 		assert.NoError(t, err)
 
 		found := false
@@ -1202,7 +1385,10 @@ func TestPopulateSDP(t *testing.T) { //nolint:cyclop
 		mediaSections := []mediaSection{{id: "video", transceivers: []*RTPTransceiver{tr}}}
 
 		d := &sdp.SessionDescription{}
-		offerSdp, err := populateSDP(d, []DTLSFingerprint{}, se.sdpMediaLevelFingerprints, se.candidates.ICELite, true, me, connectionRoleFromDtlsRole(defaultDtlsRoleOffer), []ICECandidate{}, ICEParameters{}, mediaSections, ICEGatheringStateComplete, nil, se.getSCTPMaxMessageSize(), se.ignoreRidPauseForRecv, true)
+		offerSdp, err := populateSDP(
+			d, []DTLSFingerprint{}, se.sdpMediaLevelFingerprints, se.candidates.ICELite, true, me, connectionRoleFromDtlsRole(defaultDtlsRoleOffer),
+			[]ICECandidate{}, ICEParameters{}, mediaSections, ICEGatheringStateComplete, nil, se.getSCTPMaxMessageSize(), se.ignoreRidPauseForRecv, true, RTCPMuxPolicyRequire,
+		)
 		assert.NoError(t, err)
 
 		_, ok := offerSdp.Attribute(sdp.AttrKeyCryptex)
@@ -1516,7 +1702,7 @@ func TestPopulateLocalCandidatesDoesNotMutateSDP(t *testing.T) {
 		}
 	}()
 	for range 100 {
-		populated := populateLocalCandidates(original, gatherer, ICEGatheringStateComplete)
+		populated := populateLocalCandidates(original, gatherer, ICEGatheringStateComplete, RTCPMuxPolicyRequire, nil)
 		require.NotSame(t, original, populated)
 		assert.Contains(t, populated.SDP, "a=end-of-candidates")
 		assert.Equal(t, SDPTypeAnswer, populated.Type)

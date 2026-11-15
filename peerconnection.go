@@ -3005,7 +3005,7 @@ func (pc *PeerConnection) CurrentLocalDescription() *SessionDescription {
 	iceGather := pc.iceGatherer
 	iceGatheringState := pc.ICEGatheringState()
 
-	return populateLocalCandidates(localDescription, iceGather, iceGatheringState)
+	return populateLocalCandidates(localDescription, iceGather, iceGatheringState, pc.configuration.RTCPMuxPolicy, pc.currentRemoteDescription)
 }
 
 // PendingLocalDescription represents a local description that is in the
@@ -3020,7 +3020,7 @@ func (pc *PeerConnection) PendingLocalDescription() *SessionDescription {
 	iceGather := pc.iceGatherer
 	iceGatheringState := pc.ICEGatheringState()
 
-	return populateLocalCandidates(localDescription, iceGather, iceGatheringState)
+	return populateLocalCandidates(localDescription, iceGather, iceGatheringState, pc.configuration.RTCPMuxPolicy, pc.pendingRemoteDescription)
 }
 
 // CurrentRemoteDescription represents the last remote description that was
@@ -3300,6 +3300,7 @@ func (pc *PeerConnection) generateUnmatchedSDP(
 		pc.api.settingEngine.getSCTPMaxMessageSize(),
 		false,
 		cryptexEnabledByPolicy,
+		pc.configuration.RTCPMuxPolicy,
 	)
 }
 
@@ -3447,6 +3448,11 @@ func (pc *PeerConnection) generateMatchedSDP(
 		return nil, err
 	}
 
+	rtcpMuxPolicy := pc.configuration.RTCPMuxPolicy
+	if !includeUnmatched {
+		rtcpMuxPolicy = rtcpMuxPolicyForAnswer(rtcpMuxPolicy, remoteDescription)
+	}
+
 	return populateSDP(
 		desc,
 		dtlsFingerprints,
@@ -3463,6 +3469,7 @@ func (pc *PeerConnection) generateMatchedSDP(
 		pc.api.settingEngine.getSCTPMaxMessageSize(),
 		ignoreRidPauseForRecv,
 		cryptexAtSessionLevel,
+		rtcpMuxPolicy,
 	)
 }
 
