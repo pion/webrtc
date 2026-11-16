@@ -540,8 +540,13 @@ func TestSampleBuilderPacketUnreference(t *testing.T) {
 		}
 	}
 
-	runtime.GC()
-	time.Sleep(10 * time.Millisecond)
+	// Finalizers run on their own goroutine after a GC, so wait for them to
+	// release every packet but the last one instead of sleeping a fixed time.
+	assert.Eventually(t, func() bool {
+		runtime.GC()
+
+		return atomic.LoadInt64(&refs) <= 1
+	}, 10*time.Second, 10*time.Millisecond)
 
 	remainedRefs := atomic.LoadInt64(&refs)
 	runtime.KeepAlive(fd)
