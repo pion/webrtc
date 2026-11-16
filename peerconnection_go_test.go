@@ -1016,29 +1016,16 @@ func TestICERestart(t *testing.T) {
 	firstOfferCandidates := extractCandidates(offerPC.LocalDescription().SDP)
 	firstAnswerCandidates := extractCandidates(answerPC.LocalDescription().SDP)
 
-	// Hold trickled restart candidates until both peers have the new remote credentials.
-	remoteDescriptionsSet := make(chan struct{})
-	offerPC.OnICECandidate(func(c *ICECandidate) {
-		if c != nil {
-			<-remoteDescriptionsSet
-			assert.NoError(t, answerPC.AddICECandidate(c.ToJSON()))
-		}
-	})
-
-	answerPC.OnICECandidate(func(c *ICECandidate) {
-		if c != nil {
-			<-remoteDescriptionsSet
-			assert.NoError(t, offerPC.AddICECandidate(c.ToJSON()))
-		}
-	})
-
-	// Re-signal with ICE Restart, block until ICEConnectionStateConnected
+	// Re-signal with ICE Restart, block until ICEConnectionStateConnected.
+	// Not trickled since restart gathers before the peer knows the new ufrag.
 	connectedWaitGroup.Add(2)
 	offer, err := offerPC.CreateOffer(&OfferOptions{ICERestart: true})
 	assert.NoError(t, err)
 
+	offerGatheringComplete := GatheringCompletePromise(offerPC)
 	assert.NoError(t, offerPC.SetLocalDescription(offer))
-	assert.NoError(t, answerPC.SetRemoteDescription(offer))
+	<-offerGatheringComplete
+	assert.NoError(t, answerPC.SetRemoteDescription(*offerPC.LocalDescription()))
 
 	currentSDP := answerPC.CurrentRemoteDescription().SDP
 	parsed, err := offer.Unmarshal()
@@ -1058,14 +1045,15 @@ func TestICERestart(t *testing.T) {
 		assert.Equal(t, currentSDP, answerPC.CurrentRemoteDescription().SDP)
 	}
 	assert.Contains(t, answerPC.PendingRemoteDescription().SDP, candidateStr)
-	assert.NotContains(t, answerPC.PendingRemoteDescription().SDP, "a=end-of-candidates")
+	assert.Contains(t, answerPC.PendingRemoteDescription().SDP, "a=end-of-candidates")
 
 	answer, err := answerPC.CreateAnswer(nil)
 	assert.NoError(t, err)
 
+	answerGatheringComplete := GatheringCompletePromise(answerPC)
 	assert.NoError(t, answerPC.SetLocalDescription(answer))
-	assert.NoError(t, offerPC.SetRemoteDescription(answer))
-	close(remoteDescriptionsSet)
+	<-answerGatheringComplete
+	assert.NoError(t, offerPC.SetRemoteDescription(*answerPC.LocalDescription()))
 
 	// Block until we have connected again
 	connectedWaitGroup.Wait()
@@ -3693,7 +3681,7 @@ func TestCryptexRejectedAnswerPreservesSignalingState(t *testing.T) {
 	require.False(t, hasCryptexForSession(t, answer.SDP))
 
 	require.Equal(t, SignalingStateHaveLocalOffer, pcOffer.SignalingState())
-	pendingBefore := pcOffer.PendingLocalDescription()
+	pendingBefore := pcOffer.pendingLocalDescription
 	require.NotNil(t, pendingBefore)
 
 	err = pcOffer.SetRemoteDescription(answer)
@@ -3703,8 +3691,7 @@ func TestCryptexRejectedAnswerPreservesSignalingState(t *testing.T) {
 	assert.Equal(t, SignalingStateHaveLocalOffer, pcOffer.SignalingState())
 	assert.Nil(t, pcOffer.CurrentRemoteDescription())
 	assert.Nil(t, pcOffer.PendingRemoteDescription())
-	require.NotNil(t, pcOffer.PendingLocalDescription())
-	assert.Equal(t, pendingBefore.SDP, pcOffer.PendingLocalDescription().SDP)
+	assert.Equal(t, pendingBefore, pcOffer.pendingLocalDescription)
 
 	// A corrected answer (with Cryptex added) must still be accepted, proving the connection did
 	// not get stuck in an unrecoverable signaling state.
@@ -4379,4 +4366,69 @@ func testDataChannelThenMedia(t *testing.T, answererSends bool) {
 
 	assert.NoError(t, dc.SendText("after"))
 	waitForMessage(t, messages, "after")
+}
+
+func newPairWithRejectedVideo(
+	t *testing.T,
+	direction RTPTransceiverDirection,
+) (*PeerConnection, *PeerConnection) {
+	t.Helper()
+
+	offerer, answerer, err := newPair()
+	require.NoError(t, err)
+	t.Cleanup(func() { closePairNow(t, offerer, answerer) })
+
+	_, err = offerer.AddTransceiverFromKind(RTPCodecTypeVideo,
+		RTPTransceiverInit{Direction: direction})
+	require.NoError(t, err)
+	_, err = offerer.CreateDataChannel("keepalive", nil)
+	require.NoError(t, err)
+
+	offer, err := offerer.CreateOffer(nil)
+	require.NoError(t, err)
+	require.NoError(t, offerer.SetLocalDescription(offer))
+	require.NoError(t, answerer.SetRemoteDescription(offer))
+	answer, err := answerer.CreateAnswer(nil)
+	require.NoError(t, err)
+
+	rejected := answer.parsed.MediaDescriptions[0]
+	require.Contains(t, rejected.MediaName.Formats, "96")
+	rejected.MediaName.Port.Value = 0
+	for index := range answer.parsed.Attributes {
+		if answer.parsed.Attributes[index].Key == sdp.AttrKeyGroup {
+			answer.parsed.Attributes[index].Value = "BUNDLE 1"
+		}
+	}
+	raw, err := answer.parsed.Marshal()
+	require.NoError(t, err)
+	answer.SDP = string(raw)
+	answerer.lastAnswer = answer.SDP
+	require.NoError(t, answerer.SetLocalDescription(answer))
+	require.NoError(t, offerer.SetRemoteDescription(answer))
+
+	return offerer, answerer
+}
+
+func TestReofferWithRejectedDynamicCodec(t *testing.T) {
+	for _, role := range []SDPType{SDPTypeOffer, SDPTypeAnswer} {
+		t.Run(role.String(), func(t *testing.T) {
+			pc, remote := newPairWithRejectedVideo(t, RTPTransceiverDirectionRecvonly)
+			if role == SDPTypeAnswer {
+				pc, remote = remote, pc
+			}
+
+			offer, err := pc.CreateOffer(nil)
+			require.NoError(t, err)
+			require.Zero(t, offer.parsed.MediaDescriptions[0].MediaName.Port.Value)
+			require.Equal(t, "0", getMidValue(offer.parsed.MediaDescriptions[0]))
+			require.NoError(t, pc.SetLocalDescription(offer))
+			require.NoError(t, remote.SetRemoteDescription(offer),
+				"a rejected dynamic payload must not require missing codec metadata")
+			answer, err := remote.CreateAnswer(nil)
+			require.NoError(t, err)
+			require.NoError(t, remote.SetLocalDescription(answer))
+			require.NoError(t, pc.SetRemoteDescription(answer))
+			require.Zero(t, answer.parsed.MediaDescriptions[0].MediaName.Port.Value)
+		})
+	}
 }

@@ -433,6 +433,11 @@ func (pc *PeerConnection) checkNegotiationNeeded() bool { //nolint:cyclop
 			return true
 		}
 
+		// rejected sections remain in subsequent descriptions,
+		if isRejectedMediaSection(mid) {
+			continue
+		}
+
 		// Step 5.3.1
 		if transceiver.Direction() == RTPTransceiverDirectionSendrecv ||
 			transceiver.Direction() == RTPTransceiverDirectionSendonly {
@@ -700,7 +705,7 @@ func (pc *PeerConnection) hasLocalDescriptionChanged(desc *SessionDescription) b
 			return true
 		}
 
-		if getPeerDirection(m, desc.parsed) != t.Direction() {
+		if !isRejectedMediaSection(m) && getPeerDirection(m, desc.parsed) != t.Direction() {
 			return true
 		}
 	}
@@ -1847,6 +1852,12 @@ func setRTPTransceiverCurrentDirection(
 		_, _, hasCryptex := mediaSectionCryptexState(media, bundleTagMedia, bundleMids)
 		transceiver.setRTPHeaderEncryptionNegotiated(sessionLevelCryptex || hasCryptex)
 
+		if _, bundleOnly := media.Attribute("bundle-only"); media.MediaName.Port.Value == 0 && !bundleOnly {
+			transceiver.setCurrentDirection(RTPTransceiverDirectionInactive)
+
+			continue
+		}
+
 		direction := getPeerDirection(media, answer.parsed)
 
 		// reverse direction if it was a remote answer
@@ -1897,6 +1908,28 @@ func runIfNewReceiver(
 	}
 }
 
+func (pc *PeerConnection) incomingTrackDetails(remoteDesc *SessionDescription) []trackDetails {
+	// the remote offer can contain tracks rejected by our local answer.
+	pc.mu.RLock()
+	rejectedMids := map[string]struct{}{}
+	if local := pc.currentLocalDescription; local != nil && local.Type == SDPTypeAnswer {
+		for _, media := range local.parsed.MediaDescriptions {
+			if isRejectedMediaSection(media) {
+				rejectedMids[getMidValue(media)] = struct{}{}
+			}
+		}
+	}
+	pc.mu.RUnlock()
+
+	tracks := trackDetailsFromSDP(pc.log, remoteDesc.parsed)
+
+	return slices.DeleteFunc(tracks, func(track trackDetails) bool {
+		_, rejected := rejectedMids[track.mid]
+
+		return rejected
+	})
+}
+
 // configureRTPReceivers opens knows inbound SRTP streams from the RemoteDescription.
 //
 //nolint:cyclop
@@ -1905,7 +1938,7 @@ func (pc *PeerConnection) configureRTPReceivers(
 	remoteDesc *SessionDescription,
 	currentTransceivers []*RTPTransceiver,
 ) {
-	incomingTracks := trackDetailsFromSDP(pc.log, remoteDesc.parsed)
+	incomingTracks := pc.incomingTrackDetails(remoteDesc)
 
 	if isRenegotiation { //nolint:nestif
 		for _, transceiver := range currentTransceivers {
@@ -1995,7 +2028,7 @@ func (pc *PeerConnection) configureRTPReceivers(
 
 // startRTPReceivers opens knows inbound SRTP streams from the RemoteDescription.
 func (pc *PeerConnection) startRTPReceivers(remoteDesc *SessionDescription, currentTransceivers []*RTPTransceiver) {
-	incomingTracks := trackDetailsFromSDP(pc.log, remoteDesc.parsed)
+	incomingTracks := pc.incomingTrackDetails(remoteDesc)
 	if len(incomingTracks) == 0 {
 		return
 	}
@@ -2010,6 +2043,10 @@ func (pc *PeerConnection) startRTPReceivers(remoteDesc *SessionDescription, curr
 // startRTPSenders starts all outbound RTP streams.
 func (pc *PeerConnection) startRTPSenders(currentTransceivers []*RTPTransceiver) error {
 	for _, transceiver := range currentTransceivers {
+		direction := transceiver.getCurrentDirection()
+		if direction == RTPTransceiverDirectionInactive || direction == RTPTransceiverDirectionRecvonly {
+			continue
+		}
 		if sender := transceiver.Sender(); sender != nil && sender.isNegotiated() && !sender.hasSent() {
 			err := sender.Send(sender.GetParameters())
 			if err != nil {
@@ -2577,8 +2614,15 @@ func (pc *PeerConnection) AddTrack(track TrackLocal) (*RTPSender, error) {
 
 	pc.mu.Lock()
 	defer pc.mu.Unlock()
+	answer := pc.currentRemoteDescription
+	if pc.currentLocalDescription != nil && pc.currentLocalDescription.Type == SDPTypeAnswer {
+		answer = pc.currentLocalDescription
+	}
 	for _, transceiver := range pc.rtpTransceivers {
 		if !transceiver.isSendAllowed(track.Kind()) {
+			continue
+		}
+		if answer != nil && isRejectedMediaSection(getByMid(transceiver.Mid(), answer)) {
 			continue
 		}
 
@@ -3001,11 +3045,10 @@ func (pc *PeerConnection) CurrentLocalDescription() *SessionDescription {
 	pc.mu.Lock()
 	defer pc.mu.Unlock()
 
-	localDescription := pc.currentLocalDescription
-	iceGather := pc.iceGatherer
-	iceGatheringState := pc.ICEGatheringState()
-
-	return populateLocalCandidates(localDescription, iceGather, iceGatheringState)
+	return populateLocalCandidates(
+		pc.currentLocalDescription, pc.currentLocalDescription, pc.currentRemoteDescription,
+		pc.iceGatherer, pc.ICEGatheringState(),
+	)
 }
 
 // PendingLocalDescription represents a local description that is in the
@@ -3016,11 +3059,10 @@ func (pc *PeerConnection) PendingLocalDescription() *SessionDescription {
 	pc.mu.Lock()
 	defer pc.mu.Unlock()
 
-	localDescription := pc.pendingLocalDescription
-	iceGather := pc.iceGatherer
-	iceGatheringState := pc.ICEGatheringState()
-
-	return populateLocalCandidates(localDescription, iceGather, iceGatheringState)
+	return populateLocalCandidates(
+		pc.pendingLocalDescription, pc.currentLocalDescription, pc.currentRemoteDescription,
+		pc.iceGatherer, pc.ICEGatheringState(),
+	)
 }
 
 // CurrentRemoteDescription represents the last remote description that was
@@ -3286,6 +3328,7 @@ func (pc *PeerConnection) generateUnmatchedSDP(
 
 	return populateSDP(
 		desc,
+		true, // Initial offer.
 		dtlsFingerprints,
 		pc.api.settingEngine.sdpMediaLevelFingerprints,
 		pc.api.settingEngine.candidates.ICELite,
@@ -3334,6 +3377,11 @@ func (pc *PeerConnection) generateMatchedSDP(
 	remoteDescription := pc.currentRemoteDescription
 	if pc.pendingRemoteDescription != nil {
 		remoteDescription = pc.pendingRemoteDescription
+	}
+	// re-offers match the last answer, whichever peer generated it.
+	matchedDescription := remoteDescription
+	if includeUnmatched && pc.currentLocalDescription != nil && pc.currentLocalDescription.Type == SDPTypeAnswer {
+		matchedDescription = pc.currentLocalDescription
 	}
 	isExtmapAllowMixed := isExtMapAllowMixedSet(remoteDescription.parsed)
 	localTransceivers := append([]*RTPTransceiver{}, transceivers...)
@@ -3411,7 +3459,6 @@ func (pc *PeerConnection) generateMatchedSDP(
 	pc.sctpTransport.lock.Lock()
 	defer pc.sctpTransport.lock.Unlock()
 
-	var bundleGroup *string
 	// If we are offering also include unmatched local transceivers
 	if includeUnmatched { //nolint:nestif
 		for _, t := range localTransceivers {
@@ -3436,10 +3483,6 @@ func (pc *PeerConnection) generateMatchedSDP(
 				sctpInit: localSctpInit,
 			})
 		}
-	} else if remoteDescription != nil {
-		groupValue, _ := remoteDescription.parsed.Attribute(sdp.AttrKeyGroup)
-		groupValue = strings.TrimLeft(groupValue, "BUNDLE")
-		bundleGroup = &groupValue
 	}
 
 	dtlsFingerprints, err := certificate.GetFingerprints()
@@ -3449,6 +3492,7 @@ func (pc *PeerConnection) generateMatchedSDP(
 
 	return populateSDP(
 		desc,
+		includeUnmatched,
 		dtlsFingerprints,
 		pc.api.settingEngine.sdpMediaLevelFingerprints,
 		pc.api.settingEngine.candidates.ICELite,
@@ -3459,7 +3503,7 @@ func (pc *PeerConnection) generateMatchedSDP(
 		iceParams,
 		mediaSections,
 		pc.ICEGatheringState(),
-		bundleGroup,
+		matchedDescription.parsed,
 		pc.api.settingEngine.getSCTPMaxMessageSize(),
 		ignoreRidPauseForRecv,
 		cryptexAtSessionLevel,

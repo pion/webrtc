@@ -3,7 +3,7 @@ module github.com/pion/webrtc/v5
 go 1.24.0
 
 require (
-	github.com/pion/datachannel v1.6.3
+	github.com/pion/datachannel v1.6.4
 	github.com/pion/dtls/v4 v4.0.1
 	github.com/pion/format v0.0.1
 	github.com/pion/ice/v5 v5.0.0-rc.9
@@ -12,7 +12,7 @@ require (
 	github.com/pion/randutil v0.1.0
 	github.com/pion/rtcp v1.2.20
 	github.com/pion/rtp v1.10.6
-	github.com/pion/sctp v1.12.0
+	github.com/pion/sctp v1.12.1
 	github.com/pion/sdp/v3 v3.0.20
 	github.com/pion/srtp/v3 v3.1.3
 	github.com/pion/stun/v5 v5.0.0-rc.3
