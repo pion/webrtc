@@ -1258,6 +1258,11 @@ func getMaxMessageSize(desc *sdp.MediaDescription) uint32 {
 }
 
 func getSctpInit(desc *sdp.MediaDescription) ([]byte, error) {
+	protos := strings.Join(desc.MediaName.Protos, "/")
+	if (protos != "UDP/DTLS/SCTP" && protos != "TCP/DTLS/SCTP") ||
+		!slices.Equal(desc.MediaName.Formats, []string{"webrtc-datachannel"}) {
+		return nil, nil
+	}
 	for _, a := range desc.Attributes {
 		if strings.TrimSpace(a.Key) == "sctp-init" {
 			decoded, err := base64.StdEncoding.DecodeString(a.Value)
