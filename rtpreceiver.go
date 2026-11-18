@@ -296,11 +296,15 @@ func (r *RTPReceiver) Receive(parameters RTPReceiveParameters) error {
 func (r *RTPReceiver) Read(b []byte) (n int, a interceptor.Attributes, err error) {
 	select {
 	case <-r.received:
-		if len(r.tracks) > 1 {
+		r.mu.RLock()
+		rtcpInterceptor := r.tracks[0].rtcpInterceptor
+		isSimulcast := len(r.tracks) > 1
+		r.mu.RUnlock()
+		if isSimulcast {
 			r.log.Errorf(useReadSimulcast)
 		}
 
-		return r.tracks[0].rtcpInterceptor.Read(b, a)
+		return rtcpInterceptor.Read(b, a)
 	case <-r.closedChan:
 		return 0, nil, io.ErrClosedPipe
 	}
@@ -540,8 +544,14 @@ func (r *RTPReceiver) readRTP(b []byte, reader *TrackRemote) (n int, a intercept
 		return 0, nil, io.EOF
 	}
 
+	r.mu.RLock()
+	var rtpInterceptor interceptor.RTPReader
 	if t := r.streamsForTrack(reader); t != nil {
-		return t.rtpInterceptor.Read(b, a)
+		rtpInterceptor = t.rtpInterceptor
+	}
+	r.mu.RUnlock()
+	if rtpInterceptor != nil {
+		return rtpInterceptor.Read(b, a)
 	}
 
 	return 0, nil, fmt.Errorf("%w: %d", errRTPReceiverWithSSRCTrackStreamNotFound, reader.SSRC())

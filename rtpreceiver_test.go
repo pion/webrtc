@@ -434,6 +434,53 @@ func TestRTPReceiver_readRTX_ChannelAccessSafe(t *testing.T) {
 	<-done
 }
 
+func TestRTPReceiverRIDRebindingReads(t *testing.T) {
+	api := NewAPI()
+	receiver, err := api.NewRTPReceiver(RTPCodecTypeVideo, &DTLSTransport{api: api})
+	require.NoError(t, err)
+	receiver.configureReceive(RTPReceiveParameters{Encodings: []RTPDecodingParameters{{RTPCodingParameters: RTPCodingParameters{RID: "low"}}}})
+	track := receiver.Track()
+	params := RTPParameters{Codecs: []RTPCodecParameters{{
+		RTPCodecCapability: RTPCodecCapability{MimeType: MimeTypeVP8}, PayloadType: 96,
+	}}}
+	packet := []byte{0x80, 96, 0, 1, 0, 0, 0, 0, 0, 0, 0x04, 0x57, 0xAA}
+	readPacket := interceptor.RTPReaderFunc(func(b []byte, a interceptor.Attributes) (int, interceptor.Attributes, error) {
+		return copy(b, packet), a, nil
+	})
+	bind := func(ssrc uint32) {
+		t.Helper()
+		_, bindErr := receiver.receiveForRid("low", params, &interceptor.StreamInfo{SSRC: ssrc},
+			nil, readPacket, false, nil, interceptor.RTCPReaderFunc(readPacket), nil)
+		require.NoError(t, bindErr)
+	}
+	bind(1111)
+	track.payloadType = 96
+	close(receiver.received)
+	t.Cleanup(func() { assert.NoError(t, receiver.Stop()) })
+
+	var readers sync.WaitGroup
+	defer readers.Wait()
+	for _, read := range []func([]byte) (int, interceptor.Attributes, error){
+		track.Read,
+		receiver.Read,
+		func(b []byte) (int, interceptor.Attributes, error) { return receiver.ReadSimulcast(b, "low") },
+	} {
+		readers.Add(1)
+		go func() {
+			defer readers.Done()
+			b := make([]byte, 1500)
+			for range 1000 {
+				n, _, readErr := read(b)
+				assert.NoError(t, readErr)
+				assert.Equal(t, packet, b[:n])
+			}
+		}()
+	}
+	for ssrc := uint32(1112); ssrc < 2112; ssrc++ {
+		bind(ssrc)
+	}
+}
+
 func TestRTPReceiver_ReadRTP_SimulcastNoRace(t *testing.T) {
 	receiver := &RTPReceiver{
 		kind:       RTPCodecTypeVideo,
