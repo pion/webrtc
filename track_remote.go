@@ -176,10 +176,10 @@ func (t *TrackRemote) checkAndUpdateTrack(b []byte) error {
 	}
 
 	payloadType := PayloadType(b[1] & rtpPayloadTypeBitmask)
-	if payloadType != t.PayloadType() || len(t.params.Codecs) == 0 {
-		t.mu.Lock()
-		defer t.mu.Unlock()
+	t.mu.Lock()
+	defer t.mu.Unlock()
 
+	if payloadType != t.payloadType || len(t.params.Codecs) == 0 {
 		params, err := t.receiver.api.mediaEngine.getRTPParametersByPayloadType(payloadType)
 		if err != nil {
 			return err
