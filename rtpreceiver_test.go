@@ -170,6 +170,7 @@ func TestRTPReceiver_ClosedReceiveForRIDAndRTX(t *testing.T) {
 
 func TestRTPReceiver_ReadRTP_SimulcastNoRace(t *testing.T) {
 	receiver := &RTPReceiver{
+		api:        NewAPI(),
 		kind:       RTPCodecTypeVideo,
 		received:   make(chan any),
 		closedChan: make(chan struct{}),
@@ -249,15 +250,24 @@ func TestRTPReceiver_ReadRTP_SimulcastNoRace(t *testing.T) {
 	close(lowCh)
 	wg.Wait()
 
-	// Replacing the RID being read must also synchronize its interceptor.
+	// Exercise successful public reads while the same RID is rebound.
+	lowInterceptor = interceptor.RTPReaderFunc(
+		func(b []byte, a interceptor.Attributes) (int, interceptor.Attributes, error) {
+			return copy(b, lowPkt), a, nil
+		},
+	)
+	_, err = receiver.receiveForRid("low", params, &interceptor.StreamInfo{SSRC: 1111}, &streamsForSSRCResult{rtpInterceptor: lowInterceptor}, nil)
+	require.NoError(t, err)
+
 	wg.Add(1)
 	defer wg.Wait()
 	go func() {
 		defer wg.Done()
 		b := make([]byte, 1500)
 		for range 1000 {
-			_, _, readErr := receiver.readRTP(b, lowTrack)
-			assert.ErrorIs(t, readErr, io.EOF)
+			n, _, readErr := lowTrack.Read(b)
+			assert.NoError(t, readErr)
+			assert.Equal(t, lowPkt, b[:n])
 		}
 	}()
 	for ssrc := uint32(4444); ssrc < 5444; ssrc++ {
