@@ -20,12 +20,64 @@ import (
 
 	"github.com/pion/dtls/v3"
 	dtlsElliptic "github.com/pion/dtls/v3/pkg/crypto/elliptic"
+	"github.com/pion/dtls/v3/pkg/crypto/selfsign"
 	"github.com/pion/dtls/v3/pkg/protocol/handshake"
 	"github.com/pion/srtp/v3"
 	"github.com/pion/transport/v5/test"
 	"github.com/pion/webrtc/v4/internal/mux"
 	"github.com/stretchr/testify/assert"
 )
+
+// A DTLS client that offers no use_srtp extension still connects the transport,
+// since data channels need no SRTP; only starting media then fails.
+func TestDTLSTransport_Start_ConnectsWithoutSRTPProfile(t *testing.T) {
+	lim := test.TimeOut(time.Second * 10)
+	defer lim.Stop()
+
+	report := test.CheckRoutines(t)
+	defer report()
+
+	api := NewAPI()
+	api.settingEngine.disableCertificateFingerprintVerification = true
+	loggerFactory := api.settingEngine.LoggerFactory
+
+	localConn, remoteConn := net.Pipe()
+
+	iceTransport := NewICETransport(nil, loggerFactory)
+	iceTransport.mux = mux.NewMux(mux.Config{Conn: localConn, BufferSize: 1500, LoggerFactory: loggerFactory})
+	defer func() { _ = iceTransport.mux.Close() }()
+
+	transport, err := api.NewDTLSTransport(iceTransport, nil)
+	assert.NoError(t, err)
+
+	remoteMux := mux.NewMux(mux.Config{Conn: remoteConn, BufferSize: 1500, LoggerFactory: loggerFactory})
+	defer func() { _ = remoteMux.Close() }()
+	remoteEndpoint := remoteMux.NewEndpoint(mux.MatchDTLS)
+
+	remoteCert, err := selfsign.GenerateSelfSigned()
+	assert.NoError(t, err)
+	remoteDone := make(chan error, 1)
+	go func() {
+		client, clientErr := dtls.ClientWithOptions(
+			remoteEndpoint,
+			remoteEndpoint.RemoteAddr(),
+			dtls.WithCertificates(remoteCert),
+			dtls.WithInsecureSkipVerify(true),
+		)
+		if clientErr == nil {
+			clientErr = client.Handshake()
+			defer func() { _ = client.Close() }()
+		}
+		remoteDone <- clientErr
+	}()
+
+	assert.NoError(t, transport.Start(DTLSParameters{Role: DTLSRoleClient}))
+	assert.NoError(t, <-remoteDone)
+	assert.Equal(t, DTLSTransportStateConnected, transport.State())
+	assert.ErrorIs(t, transport.wantSRTP(), ErrNoSRTPProtectionProfile)
+
+	assert.NoError(t, transport.Stop())
+}
 
 // An invalid fingerprint MUST cause DTLSTransport to go to failed state.
 func TestInvalidFingerprintCausesFailed(t *testing.T) { //nolint:cyclop
