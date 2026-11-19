@@ -484,6 +484,10 @@ func (r *RTPSender) SetReadDeadlineSimulcast(deadline time.Time, rid string) err
 
 	for _, t := range r.trackEncodings {
 		if t.track != nil && t.track.RID() == rid {
+			if t.srtpStream == nil {
+				return errRTPSenderSendNotCalled
+			}
+
 			return t.srtpStream.SetReadDeadline(deadline)
 		}
 	}
