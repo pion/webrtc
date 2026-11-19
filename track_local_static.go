@@ -197,8 +197,13 @@ func (s *TrackLocalStaticRTP) writeRTP(packet *rtp.Packet) error {
 	defer s.mu.RUnlock()
 
 	writeErrs := []error{}
+	header := packet.Header
 
 	for _, b := range s.bindings {
+		// Every binding belongs to a different RTPSender, whose interceptors may modify the header in place
+		// (e.g. add header extensions using the IDs negotiated with that peer). Start each one from a fresh
+		// copy so that those changes are not sent to the following bindings.
+		packet.Header = header.Clone()
 		packet.Header.SSRC = uint32(b.ssrc)
 		packet.Header.PayloadType = uint8(b.payloadType)
 		// b.writeStream.WriteRTP below expects header and payload separately, so value of Packet.PaddingSize
