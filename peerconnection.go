@@ -2189,7 +2189,7 @@ func (pc *PeerConnection) handleIncomingSSRC(rtpStream *srtp.ReadStreamSRTP, ssr
 		params.Codecs[0].RTPCodecCapability,
 		params.HeaderExtensions,
 	)
-	result, err := pc.dtlsTransport.streamsForSSRC(ssrc, *streamInfo)
+	result, err := pc.dtlsTransport.streamsForSSRC(ssrc, streamInfo)
 	if err != nil {
 		return err
 	}
@@ -2197,6 +2197,14 @@ func (pc *PeerConnection) handleIncomingSSRC(rtpStream *srtp.ReadStreamSRTP, ssr
 	interceptor := result.rtpInterceptor
 	rtcpReadStream := result.rtcpReadStream
 	rtcpInterceptor := result.rtcpInterceptor
+
+	// Until a RTPReceiver takes ownership of the stream nothing else will unbind it
+	handedToReceiver := false
+	defer func() {
+		if !handedToReceiver {
+			pc.api.interceptor.UnbindRemoteStream(streamInfo)
+		}
+	}()
 
 	// try to read simulcast IDs from the packet we already have
 	mid, rid, rsid, _, err := handleUnknownRTPPacket(
@@ -2219,9 +2227,9 @@ func (pc *PeerConnection) handleIncomingSSRC(rtpStream *srtp.ReadStreamSRTP, ssr
 				readCount--
 			}
 
-			i, attributes, err := interceptor.Read(b, nil)
-			if err != nil {
-				return err
+			i, attributes, readErr := interceptor.Read(b, nil)
+			if readErr != nil {
+				return readErr
 			}
 
 			peekedPackets = append(peekedPackets, &peekedPacket{
@@ -2248,7 +2256,7 @@ func (pc *PeerConnection) handleIncomingSSRC(rtpStream *srtp.ReadStreamSRTP, ssr
 			}
 
 			if rsid != "" {
-				return receiver.receiveForRtx(
+				if err = receiver.receiveForRtx(
 					SSRC(0),
 					rsid,
 					streamInfo,
@@ -2257,7 +2265,12 @@ func (pc *PeerConnection) handleIncomingSSRC(rtpStream *srtp.ReadStreamSRTP, ssr
 					result.startRTPReaderImmediately,
 					rtcpReadStream,
 					rtcpInterceptor,
-				)
+				); err != nil {
+					return err
+				}
+				handedToReceiver = true
+
+				return nil
 			}
 
 			track, err := receiver.receiveForRid(
@@ -2274,13 +2287,12 @@ func (pc *PeerConnection) handleIncomingSSRC(rtpStream *srtp.ReadStreamSRTP, ssr
 			if err != nil {
 				return err
 			}
+			handedToReceiver = true
 			pc.onTrack(track, receiver)
 
 			return nil
 		}
 	}
-
-	pc.api.interceptor.UnbindRemoteStream(streamInfo)
 
 	return errPeerConnSimulcastIncomingSSRCFailed
 }
