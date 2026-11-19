@@ -1269,6 +1269,9 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error {
 
 	// An answer can only keep or drop the simulcast rids of our offer, it cannot add any.
 	if (desc.Type == SDPTypeAnswer || desc.Type == SDPTypePranswer) && localDesc != nil && localDesc.parsed != nil {
+		if haveDataChannel(&desc) != nil && haveDataChannel(localDesc) == nil {
+			return &rtcerr.InvalidAccessError{Err: errPeerConnDataChannelNotOffered}
+		}
 		if err := checkAnswerRids(localDesc.parsed, desc.parsed); err != nil {
 			return &rtcerr.InvalidAccessError{Err: err}
 		}
