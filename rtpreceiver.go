@@ -297,11 +297,18 @@ func (r *RTPReceiver) Read(b []byte) (n int, a interceptor.Attributes, err error
 	select {
 	case <-r.received:
 		r.mu.RLock()
-		rtcpInterceptor := r.tracks[0].rtcpInterceptor
+		var rtcpInterceptor interceptor.RTCPReader
+		if len(r.tracks) > 0 {
+			rtcpInterceptor = r.tracks[0].rtcpInterceptor
+		}
 		isSimulcast := len(r.tracks) > 1
 		r.mu.RUnlock()
 		if isSimulcast {
 			r.log.Errorf(useReadSimulcast)
+		}
+
+		if rtcpInterceptor == nil {
+			return 0, nil, errRTPReceiverForRIDTrackStreamNotFound
 		}
 
 		return rtcpInterceptor.Read(b, a)
@@ -768,6 +775,10 @@ func (r *RTPReceiver) SetReadDeadline(t time.Time) error {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
+	if len(r.tracks) == 0 || r.tracks[0].rtcpReadStream == nil {
+		return errRTPReceiverForRIDTrackStreamNotFound
+	}
+
 	return r.tracks[0].rtcpReadStream.SetReadDeadline(t)
 }
 
@@ -778,7 +789,7 @@ func (r *RTPReceiver) SetReadDeadlineSimulcast(deadline time.Time, rid string) e
 	defer r.mu.RUnlock()
 
 	for _, t := range r.tracks {
-		if t.track != nil && t.track.rid == rid {
+		if t.track != nil && t.track.rid == rid && t.rtcpReadStream != nil {
 			return t.rtcpReadStream.SetReadDeadline(deadline)
 		}
 	}
@@ -792,7 +803,7 @@ func (r *RTPReceiver) setRTPReadDeadline(deadline time.Time, reader *TrackRemote
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
-	if t := r.streamsForTrack(reader); t != nil {
+	if t := r.streamsForTrack(reader); t != nil && t.rtpReadStream != nil {
 		return t.rtpReadStream.SetReadDeadline(deadline)
 	}
 
