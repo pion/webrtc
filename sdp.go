@@ -692,7 +692,8 @@ func addTransceiverSDP(
 	parameters := mediaEngine.getRTPParametersByKind(transceiver.kind, directions)
 	for _, rtpExtension := range parameters.HeaderExtensions {
 		if mediaSection.matchExtensions != nil {
-			if _, enabled := mediaSection.matchExtensions[rtpExtension.URI]; !enabled {
+			// An answer may only echo the extension with the ID the remote media section offered.
+			if id, enabled := mediaSection.matchExtensions[rtpExtension.URI]; !enabled || id != rtpExtension.ID {
 				continue
 			}
 		}

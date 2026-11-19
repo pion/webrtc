@@ -579,23 +579,47 @@ func (m *MediaEngine) updateHeaderExtension(id int, extension string, typ RTPCod
 
 	for _, localExtension := range m.headerExtensions {
 		if localExtension.uri == extension {
-			h := mediaEngineHeaderExtension{uri: extension, allowedDirections: localExtension.allowedDirections}
+			headerExtension := mediaEngineHeaderExtension{uri: extension, allowedDirections: localExtension.allowedDirections}
 			if existingValue, ok := m.negotiatedHeaderExtensions[id]; ok {
-				h = existingValue
+				headerExtension = existingValue
 			}
 
 			switch {
 			case localExtension.isAudio && typ == RTPCodecTypeAudio:
-				h.isAudio = true
+				headerExtension.isAudio = true
 			case localExtension.isVideo && typ == RTPCodecTypeVideo:
-				h.isVideo = true
+				headerExtension.isVideo = true
 			}
 
-			m.negotiatedHeaderExtensions[id] = h
+			m.negotiatedHeaderExtensions[id] = headerExtension
+			m.releaseOtherHeaderExtensionIDs(id, headerExtension.uri, typ)
 		}
 	}
 
 	return nil
+}
+
+// A header extension is negotiated under one ID per kind. The IDs are picked by the remote, so when
+// it moves an extension to another ID the previous one is released instead of staying negotiated
+// forever and being listed next to the new one.
+func (m *MediaEngine) releaseOtherHeaderExtensionIDs(id int, uri string, typ RTPCodecType) {
+	for otherID, other := range m.negotiatedHeaderExtensions {
+		if otherID == id || other.uri != uri {
+			continue
+		}
+
+		if typ == RTPCodecTypeAudio {
+			other.isAudio = false
+		} else if typ == RTPCodecTypeVideo {
+			other.isVideo = false
+		}
+
+		if other.isAudio || other.isVideo {
+			m.negotiatedHeaderExtensions[otherID] = other
+		} else {
+			delete(m.negotiatedHeaderExtensions, otherID)
+		}
+	}
 }
 
 func (m *MediaEngine) pushCodecs(codecs []RTPCodecParameters, typ RTPCodecType) error {
