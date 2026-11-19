@@ -97,6 +97,8 @@ type srtpRTPReader struct {
 func (r *srtpRTPReader) Read(in []byte, a interceptor.Attributes) (int, interceptor.Attributes, error) {
 	stream, err := r.readStream.NextStream()
 	if err != nil {
+		wakeSRTPReadersOnEOF(r.readStream, err)
+
 		return 0, a, err
 	}
 	if repair := r.repair.Load(); repair != nil && stream == repair.readStream {
@@ -104,6 +106,14 @@ func (r *srtpRTPReader) Read(in []byte, a interceptor.Attributes) (int, intercep
 	}
 
 	return r.interceptor.Read(in, a)
+}
+
+func wakeSRTPReadersOnEOF(stream *srtp.ReadStreamSRTP, err error) {
+	if errors.Is(err, io.EOF) {
+		// A closed SRTP stream can have multiple readers. Expiring its deadline
+		// wakes readers still blocked on it.
+		_ = stream.SetReadDeadline(time.Now())
+	}
 }
 
 // NewDTLSTransport creates a new DTLSTransport.
@@ -883,6 +893,7 @@ func (t *DTLSTransport) streamsForSSRC(
 	rtpReader.interceptor = t.api.interceptor.BindRemoteStream(&streamInfo, interceptor.RTPReaderFunc(
 		func(in []byte, a interceptor.Attributes) (int, interceptor.Attributes, error) {
 			n, readErr := source.Read(in)
+			wakeSRTPReadersOnEOF(rtpReadStream, readErr)
 
 			return n, a, readErr
 		},
