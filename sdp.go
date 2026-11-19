@@ -180,11 +180,15 @@ func trackDetailsFromSDP(
 			}
 		}
 
-		if rids := getRids(media); len(rids) != 0 && track.id != "" && track.streamID != "" {
-			track.ssrcs = nil
-			for _, rid := range rids {
-				track.rids = append(track.rids, rid.id)
+		if track.id != "" && track.streamID != "" {
+			for _, rid := range getRids(media) {
+				if rid.direction != sdpRidDirectionRecv {
+					track.rids = append(track.rids, rid.id)
+				}
 			}
+		}
+		if len(track.rids) != 0 {
+			track.ssrcs = nil
 		} else if len(track.ssrcs) != 0 {
 			for repair, base := range rtxRepairFlows {
 				if pos := slices.Index(track.ssrcs, base); pos != -1 {
@@ -242,7 +246,11 @@ func getRids(media *sdp.MediaDescription) []*simulcastRid { //nolint:cyclop
 	for _, attr := range media.Attributes {
 		if attr.Key == sdpAttributeRid {
 			split := strings.Split(attr.Value, " ")
-			rids = append(rids, &simulcastRid{id: split[0], attrValue: attr.Value})
+			rid := &simulcastRid{id: split[0], attrValue: attr.Value}
+			if len(split) > 1 {
+				rid.direction = split[1]
+			}
+			rids = append(rids, rid)
 		} else if attr.Key == sdpAttributeSimulcast {
 			simulcastAttr = attr.Value
 		}
@@ -283,6 +291,37 @@ func getRids(media *sdp.MediaDescription) []*simulcastRid { //nolint:cyclop
 	})
 
 	return rids
+}
+
+// checkAnswerRids rejects an answer that announces simulcast rids the matching
+// media section of our offer did not offer to receive. An answer may only keep
+// or drop the rids it was offered, it cannot add any (RFC 8853 Section 5.3.2).
+func checkAnswerRids(offer, answer *sdp.SessionDescription) error {
+	offeredRids := map[string]map[string]bool{}
+	for _, media := range offer.MediaDescriptions {
+		midValue := getMidValue(media)
+		offeredRids[midValue] = map[string]bool{}
+		for _, rid := range getRids(media) {
+			if rid.direction == sdpRidDirectionRecv {
+				offeredRids[midValue][rid.id] = true
+			}
+		}
+	}
+
+	for _, media := range answer.MediaDescriptions {
+		midValue := getMidValue(media)
+		for _, rid := range getRids(media) {
+			// A rid the remote only wants to receive cannot make us receive anything.
+			if rid.direction == sdpRidDirectionRecv {
+				continue
+			}
+			if !offeredRids[midValue][rid.id] {
+				return fmt.Errorf("%w: mid %q rid %q", errPeerConnSimulcastRidNotOffered, midValue, rid.id)
+			}
+		}
+	}
+
+	return nil
 }
 
 func addCandidatesToMediaDescriptions(
@@ -695,6 +734,7 @@ func addTransceiverSDP(
 
 type simulcastRid struct {
 	id        string
+	direction string
 	attrValue string
 	paused    bool
 }

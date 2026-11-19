@@ -1361,6 +1361,9 @@ func (pc *PeerConnection) validateRemoteDescription(desc *SessionDescription) er
 				errSDPDoesNotMatchOffer, getMidValue(media))}
 		}
 	}
+	if err := checkAnswerRids(offer.parsed, desc.parsed); err != nil {
+		return &rtcerr.InvalidAccessError{Err: err}
+	}
 
 	return nil
 }

@@ -36,6 +36,8 @@ const (
 
 	sdpAttributeRid = "rid"
 
+	sdpRidDirectionRecv = "recv"
+
 	sdpAttributeSimulcast = "simulcast"
 
 	ssrcGroupSimulcast = "SIM"
