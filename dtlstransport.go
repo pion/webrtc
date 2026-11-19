@@ -610,6 +610,9 @@ func (t *DTLSTransport) completeStart(dtlsConn *dtls.Conn) error {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
+	if err == nil && len(t.remoteCertificate) == 0 {
+		err = errNoRemoteCertificate
+	}
 	if err != nil {
 		t.onStateChange(DTLSTransportStateFailed)
 

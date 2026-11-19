@@ -584,6 +584,7 @@ func (e *SettingEngine) SetDTLSExtendedMasterSecret(extendedMasterSecret dtls.Ex
 }
 
 // SetDTLSClientAuth sets the client auth type for DTLS.
+// WebRTC requires a peer certificate even when DTLS client auth is optional.
 func (e *SettingEngine) SetDTLSClientAuth(clientAuth dtls.ClientAuthType) {
 	e.dtls.clientAuth = &clientAuth
 }
