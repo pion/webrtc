@@ -6,6 +6,7 @@ package fmtp
 import "strings"
 
 type h265FMTP struct {
+	clockRate  uint32
 	parameters map[string]string
 }
 
@@ -27,6 +28,10 @@ func (h *h265FMTP) MimeType() string {
 func (h *h265FMTP) Match(b FMTP) bool {
 	fmtp, ok := b.(*h265FMTP)
 	if !ok {
+		return false
+	}
+
+	if !ClockRateEqual(h.MimeType(), h.clockRate, fmtp.clockRate) {
 		return false
 	}
 

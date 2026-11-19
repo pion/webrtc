@@ -1207,12 +1207,14 @@ func codecsFromMediaDescription(mediaDescr *sdp.MediaDescription) (out []RTPCode
 			return nil, fmt.Errorf("%w: payload type %d", errSDPPayloadTypeNotFound, payloadType)
 		}
 
+		mimeType := mediaDescr.MediaName.Media + "/" + codec.Name
+
 		channels := uint16(0)
 		val, err := strconv.ParseUint(codec.EncodingParameters, 10, 16)
 		if err == nil {
 			channels = uint16(val)
 		} else if codec.EncodingParameters == "" {
-			channels = fmtp.DefaultChannels(mediaDescr.MediaName.Media + "/" + codec.Name)
+			channels = fmtp.DefaultChannels(mimeType)
 		}
 
 		feedback := []RTCPFeedback{}
@@ -1228,8 +1230,8 @@ func codecsFromMediaDescription(mediaDescr *sdp.MediaDescription) (out []RTPCode
 
 		out = append(out, RTPCodecParameters{
 			RTPCodecCapability: RTPCodecCapability{
-				mediaDescr.MediaName.Media + "/" + codec.Name,
-				codec.ClockRate,
+				mimeType,
+				fmtp.ClockRateOrDefault(mimeType, codec.ClockRate),
 				channels,
 				codec.Fmtp,
 				feedback,

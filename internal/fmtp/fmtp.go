@@ -8,7 +8,11 @@ import (
 	"strings"
 )
 
-func defaultClockRate(mimeType string) uint32 {
+// ClockRateOrDefault replaces an omitted (zero) clock rate with the codec's default.
+func ClockRateOrDefault(mimeType string, clockRate uint32) uint32 {
+	if clockRate != 0 {
+		return clockRate
+	}
 	switch {
 	case strings.EqualFold(mimeType, "audio/opus"):
 		return 48000
@@ -54,14 +58,8 @@ func ClockRateEqual(mimeType string, valA, valB uint32) bool {
 	// Lots of users use formats without setting clock rate or channels.
 	// In this case, use default values.
 	// It would be better to remove this exception in a future major release.
-	if valA == 0 {
-		valA = defaultClockRate(mimeType)
-	}
-	if valB == 0 {
-		valB = defaultClockRate(mimeType)
-	}
 
-	return valA == valB
+	return ClockRateOrDefault(mimeType, valA) == ClockRateOrDefault(mimeType, valB)
 }
 
 // ChannelsEqual checks whether two channels are equal.
@@ -127,21 +125,25 @@ func Parse(mimeType string, clockRate uint32, channels uint16, line string) FMTP
 	switch {
 	case strings.EqualFold(mimeType, "video/h264"):
 		fmtp = &h264FMTP{
+			clockRate:  clockRate,
 			parameters: parameters,
 		}
 
 	case strings.EqualFold(mimeType, "video/h265"):
 		fmtp = &h265FMTP{
+			clockRate:  clockRate,
 			parameters: parameters,
 		}
 
 	case strings.EqualFold(mimeType, "video/vp9"):
 		fmtp = &vp9FMTP{
+			clockRate:  clockRate,
 			parameters: parameters,
 		}
 
 	case strings.EqualFold(mimeType, "video/av1"):
 		fmtp = &av1FMTP{
+			clockRate:  clockRate,
 			parameters: parameters,
 		}
 

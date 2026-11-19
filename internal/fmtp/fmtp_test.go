@@ -99,6 +99,7 @@ func TestParse(t *testing.T) {
 			0,
 			"key-name=value",
 			&h264FMTP{
+				clockRate: 90000,
 				parameters: map[string]string{
 					"key-name": "value",
 				},
@@ -111,6 +112,7 @@ func TestParse(t *testing.T) {
 			0,
 			"key-name=value",
 			&h265FMTP{
+				clockRate: 90000,
 				parameters: map[string]string{
 					"key-name": "value",
 				},
@@ -123,6 +125,7 @@ func TestParse(t *testing.T) {
 			0,
 			"key-name=value",
 			&vp9FMTP{
+				clockRate: 90000,
 				parameters: map[string]string{
 					"key-name": "value",
 				},
@@ -135,6 +138,7 @@ func TestParse(t *testing.T) {
 			0,
 			"key-name=value",
 			&av1FMTP{
+				clockRate: 90000,
 				parameters: map[string]string{
 					"key-name": "value",
 				},
@@ -773,7 +777,7 @@ func TestDefaults(t *testing.T) {
 		{"video/vp8", 90000, 0},
 	} {
 		t.Run(ca.mimeType, func(t *testing.T) {
-			assert.Equal(t, ca.clockRate, defaultClockRate(ca.mimeType))
+			assert.Equal(t, ca.clockRate, ClockRateOrDefault(ca.mimeType, 0))
 			assert.Equal(t, ca.channels, DefaultChannels(ca.mimeType))
 		})
 	}
