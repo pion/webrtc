@@ -1955,7 +1955,8 @@ func (pc *PeerConnection) startRTPReceivers(remoteDesc *SessionDescription, curr
 // startRTPSenders starts all outbound RTP streams.
 func (pc *PeerConnection) startRTPSenders(currentTransceivers []*RTPTransceiver) error {
 	for _, transceiver := range currentTransceivers {
-		if sender := transceiver.Sender(); sender != nil && sender.isNegotiated() && !sender.hasSent() {
+		if sender := transceiver.Sender(); sender != nil && sender.isNegotiated() && !sender.hasSent() &&
+			!sender.hasStopped() {
 			err := sender.Send(sender.GetParameters())
 			if err != nil {
 				return err
