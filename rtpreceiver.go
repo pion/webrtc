@@ -239,7 +239,7 @@ func (r *RTPReceiver) startReceive(parameters RTPReceiveParameters) error { //no
 			globalParams.HeaderExtensions,
 		)
 
-		result, err := r.transport.streamsForSSRC(parameters.Encodings[i].SSRC, *streams.streamInfo)
+		result, err := r.transport.streamsForSSRC(parameters.Encodings[i].SSRC, streams.streamInfo)
 		if err != nil {
 			return err
 		}
@@ -257,10 +257,7 @@ func (r *RTPReceiver) startReceive(parameters RTPReceiveParameters) error { //no
 			rtxCodec.RTCPFeedback = nil
 			rtxCodec.MimeType = MimeTypeRTX
 			streamInfo := createStreamInfo("", rtxSsrc, 0, 0, 0, 0, 0, rtxCodec, globalParams.HeaderExtensions)
-			result, err = r.transport.streamsForSSRC(
-				rtxSsrc,
-				*streamInfo,
-			)
+			result, err = r.transport.streamsForSSRC(rtxSsrc, streamInfo)
 			if err != nil {
 				return err
 			}
