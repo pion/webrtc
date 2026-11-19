@@ -259,21 +259,64 @@ func (r *SCTPTransport) Stop() error {
 	return nil
 }
 
+// openedDataChannels returns the underlying channels of the DataChannels that
+// currently own an SCTP stream: the ones registered with the transport plus the
+// given ones, which are still tracked when Detach has removed them from the
+// transport. The remote may send on one of these streams before the DataChannel
+// is opened locally (negotiated channels, or a remote that ignores the DTLS role
+// parity of RFC 8832), and such a stream must not be accepted a second time.
+func (r *SCTPTransport) openedDataChannels(existingDataChannels []*DataChannel) []*datachannel.DataChannel {
+	r.lock.RLock()
+	dataChannels := make([]*DataChannel, 0, len(r.dataChannels)+len(existingDataChannels))
+	dataChannels = append(dataChannels, r.dataChannels...)
+	r.lock.RUnlock()
+	dataChannels = append(dataChannels, existingDataChannels...)
+
+	opened := make([]*datachannel.DataChannel, 0, len(dataChannels))
+	for _, dc := range dataChannels {
+		if dc.ReadyState() == DataChannelStateClosed {
+			continue
+		}
+		dc.mu.RLock()
+		channel := dc.dataChannel
+		dc.mu.RUnlock()
+		if channel != nil {
+			opened = append(opened, channel)
+		}
+	}
+
+	return opened
+}
+
+// claimDataChannelID records that the remote opened a DataChannel on the given
+// stream identifier. It fails if a DataChannel created locally already reserved
+// it: the remote can create a stream in the association before the local
+// DataChannel is opened, and generateAndSetDataChannelID cannot see such
+// streams. An identifier of the local DTLS role's parity can only have been
+// reserved locally (RFC 8832 section 6.1), any other one the remote may reuse
+// after the DataChannel that used it was closed.
+func (r *SCTPTransport) claimDataChannelID(dtlsRole DTLSRole, id uint16) bool {
+	localParity := uint16(0)
+	if dtlsRole != DTLSRoleClient {
+		localParity++
+	}
+
+	r.lock.Lock()
+	defer r.lock.Unlock()
+
+	if _, ok := r.dataChannelIDsUsed[id]; ok && id%2 == localParity {
+		return false
+	}
+	r.dataChannelIDsUsed[id] = struct{}{}
+
+	return true
+}
+
 //nolint:cyclop
 func (r *SCTPTransport) acceptDataChannels(
 	assoc *sctp.Association,
 	existingDataChannels []*DataChannel,
 ) {
-	dataChannels := make([]*datachannel.DataChannel, 0, len(existingDataChannels))
-	for _, dc := range existingDataChannels {
-		dc.mu.Lock()
-		isNil := dc.dataChannel == nil
-		dc.mu.Unlock()
-		if isNil {
-			continue
-		}
-		dataChannels = append(dataChannels, dc.dataChannel)
-	}
 ACCEPT:
 	for {
 		// check if the association has been stopped before calling accept.
@@ -287,6 +330,9 @@ ACCEPT:
 			return
 		}
 
+		// DataChannels created after the association came up own streams too,
+		// so the list cannot be computed once before the loop.
+		dataChannels := r.openedDataChannels(existingDataChannels)
 		dc, err := datachannel.Accept(assoc, &datachannel.Config{
 			LoggerFactory: r.api.settingEngine.LoggerFactory,
 		}, dataChannels...)
@@ -305,6 +351,15 @@ ACCEPT:
 			if ch.StreamIdentifier() == dc.StreamIdentifier() {
 				continue ACCEPT
 			}
+		}
+		// A DataChannel may also have been opened locally on this stream while
+		// Accept was blocked waiting for the remote's DATA_CHANNEL_OPEN. The
+		// local DataChannel keeps the stream and the remote's open is ignored.
+		if !r.claimDataChannelID(r.dtlsTransport.role(), dc.StreamIdentifier()) {
+			r.log.Warnf("Ignoring remote data channel on stream %d which is used by a local data channel",
+				dc.StreamIdentifier())
+
+			continue ACCEPT
 		}
 
 		var (
