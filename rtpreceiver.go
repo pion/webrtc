@@ -594,6 +594,9 @@ func (r *RTPReceiver) receiveForRid(
 			r.tracks[i].track.peekedPackets = peekedPackets
 			r.tracks[i].track.mu.Unlock()
 
+			if previous := r.tracks[i].rtpReadStream; previous != nil && previous != rtpReadStream {
+				r.releaseSimulcastStream(previous, r.tracks[i].rtcpReadStream, r.tracks[i].streamInfo)
+			}
 			r.tracks[i].streamInfo = streamInfo
 			r.tracks[i].rtpReadStream = rtpReadStream
 			r.tracks[i].rtpInterceptor = rtpInterceptor
@@ -657,9 +660,7 @@ func (r *RTPReceiver) receiveForRtxInternal(
 		for i := range r.tracks {
 			if r.tracks[i].track.RID() == rsid {
 				track = &r.tracks[i]
-				if track.track.RtxSSRC() == 0 {
-					track.track.setRtxSSRC(SSRC(streamInfo.SSRC))
-				}
+				track.track.setRtxSSRC(SSRC(streamInfo.SSRC))
 
 				break
 			}
@@ -670,6 +671,9 @@ func (r *RTPReceiver) receiveForRtxInternal(
 		return fmt.Errorf("%w: ssrc(%d) rsid(%s)", errRTPReceiverForRIDTrackStreamNotFound, ssrc, rsid)
 	}
 
+	if previous := track.repairReadStream; previous != nil && previous != rtpReadStream {
+		r.releaseSimulcastStream(previous, track.repairRtcpReadStream, track.repairStreamInfo)
+	}
 	track.repairStreamInfo = streamInfo
 	track.repairReadStream = rtpReadStream
 	track.repairInterceptor = rtpInterceptor
@@ -681,6 +685,20 @@ func (r *RTPReceiver) receiveForRtxInternal(
 	r.maybeStartRepairStreamReader(track)
 
 	return nil
+}
+
+// releaseSimulcastStream drops a stream replaced by a new SSRC for the same RID.
+func (r *RTPReceiver) releaseSimulcastStream(
+	rtpStream *srtp.ReadStreamSRTP, rtcpStream *srtp.ReadStreamSRTCP, info *interceptor.StreamInfo,
+) {
+	_ = rtpStream.Close()
+	if rtcpStream != nil {
+		_ = rtcpStream.Close()
+	}
+	if info != nil {
+		r.api.interceptor.UnbindRemoteStream(info)
+	}
+	r.transport.removeSimulcastStream(rtpStream)
 }
 
 // maybeStartRepairStreamReader starts repair processing when needed. The caller must hold r.mu.
