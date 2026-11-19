@@ -214,9 +214,26 @@ func primaryPayloadTypeForRTXExists(needle RTPCodecParameters, haystack []RTPCod
 		return
 	}
 
+	return primaryPayloadTypeForRTXExistsParsed(
+		needle,
+		fmtp.Parse(needle.MimeType, needle.ClockRate, needle.Channels, needle.SDPFmtpLine),
+		haystack,
+	)
+}
+
+// primaryPayloadTypeForRTXExistsParsed is primaryPayloadTypeForRTXExists for a needle
+// whose fmtp line is already parsed.
+func primaryPayloadTypeForRTXExistsParsed(
+	needle RTPCodecParameters,
+	needleFmtp fmtp.FMTP,
+	haystack []RTPCodecParameters,
+) (isRTX bool, primaryExists bool) {
+	if !strings.EqualFold(needle.MimeType, MimeTypeRTX) {
+		return
+	}
+
 	isRTX = true
-	parsed := fmtp.Parse(needle.MimeType, needle.ClockRate, needle.Channels, needle.SDPFmtpLine)
-	aptPayload, ok := parsed.Parameter("apt")
+	aptPayload, ok := needleFmtp.Parameter("apt")
 	if !ok {
 		return
 	}
@@ -242,6 +259,24 @@ func filterUnattachedRTX(codecs []RTPCodecParameters) []RTPCodecParameters {
 	for i := len(codecs) - 1; i >= 0; i-- {
 		c := codecs[i]
 		if isRTX, primaryExists := primaryPayloadTypeForRTXExists(c, codecs); isRTX && !primaryExists {
+			// no primary for RTX, remove the RTX
+			codecs = append(codecs[:i], codecs[i+1:]...)
+		}
+	}
+
+	return codecs
+}
+
+// filterUnattachedRTXParsed is filterUnattachedRTX for codecs whose fmtp lines are
+// already parsed. Unlike filterUnattachedRTX it does not modify the passed slice.
+func filterUnattachedRTXParsed(codecs []RTPCodecParameters, codecsFmtp []fmtp.FMTP) []RTPCodecParameters {
+	// make a copy as this slice is modified, the passed one is owned by the MediaEngine
+	codecs = append([]RTPCodecParameters{}, codecs...)
+
+	// codecs are only removed at or after i, so codecsFmtp[i] still belongs to codecs[i]
+	for i := len(codecs) - 1; i >= 0; i-- {
+		isRTX, primaryExists := primaryPayloadTypeForRTXExistsParsed(codecs[i], codecsFmtp[i], codecs)
+		if isRTX && !primaryExists {
 			// no primary for RTX, remove the RTX
 			codecs = append(codecs[:i], codecs[i+1:]...)
 		}

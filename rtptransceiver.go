@@ -14,6 +14,7 @@ import (
 
 	"github.com/pion/rtp"
 	"github.com/pion/sdp/v3"
+	"github.com/pion/webrtc/v4/internal/fmtp"
 )
 
 // RTPTransceiver represents a combination of an RTPSender and an RTPReceiver that share a common mid.
@@ -60,8 +61,7 @@ func (t *RTPTransceiver) SetCodecPreferences(codecs []RTPCodecParameters) error 
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
-	mediaEngineCodecs := t.api.mediaEngine.getCodecsByKind(t.kind)
-	mediaEngineFmtp := parseCodecFMTPs(mediaEngineCodecs)
+	mediaEngineCodecs, mediaEngineFmtp := t.api.mediaEngine.getCodecsAndFMTPsByKind(t.kind)
 	for _, codec := range codecs {
 		if _, matchType := codecParametersFuzzySearchParsed(
 			codec, mediaEngineCodecs, mediaEngineFmtp,
@@ -80,13 +80,12 @@ func (t *RTPTransceiver) getCodecs() []RTPCodecParameters {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
 
-	mediaEngineCodecs := t.api.mediaEngine.getCodecsByKind(t.kind)
+	mediaEngineCodecs, mediaEngineFmtp := t.api.mediaEngine.getCodecsAndFMTPsByKind(t.kind)
 	if len(t.codecs) == 0 {
-		return filterUnattachedRTX(mediaEngineCodecs)
+		return filterUnattachedRTXParsed(mediaEngineCodecs, mediaEngineFmtp)
 	}
 
 	filteredCodecs := []RTPCodecParameters{}
-	mediaEngineFmtp := parseCodecFMTPs(mediaEngineCodecs)
 	for _, codec := range t.codecs {
 		if c, matchType := codecParametersFuzzySearchParsed(
 			codec, mediaEngineCodecs, mediaEngineFmtp,
@@ -114,8 +113,10 @@ func (t *RTPTransceiver) setCodecPreferencesFromRemoteDescription(media *sdp.Med
 		offeredPayloads[codec.PayloadType] = true
 	}
 
-	// make a copy as this slice is modified
-	leftCodecs := append([]RTPCodecParameters{}, t.api.mediaEngine.getCodecsByKind(t.kind)...)
+	// make a copy as these slices are modified, leftFmtp is kept in step with leftCodecs
+	mediaEngineCodecs, mediaEngineFmtp := t.api.mediaEngine.getCodecsAndFMTPsByKind(t.kind)
+	leftCodecs := append([]RTPCodecParameters{}, mediaEngineCodecs...)
+	leftFmtp := append([]fmtp.FMTP{}, mediaEngineFmtp...)
 
 	// find codec matches between what is in remote description and
 	// the transceivers codecs and use payload type registered to
@@ -132,6 +133,7 @@ func (t *RTPTransceiver) setCodecPreferencesFromRemoteDescription(media *sdp.Med
 			matchCodec, matchType := matchCodecWithPayloadIdentity(
 				remoteCodec,
 				leftCodecs,
+				leftFmtp,
 				offeredPayloads,
 			)
 			if matchType == matchFilter {
@@ -147,6 +149,7 @@ func (t *RTPTransceiver) setCodecPreferencesFromRemoteDescription(media *sdp.Med
 				for leftCodecIdx, codec := range leftCodecs {
 					if codec.PayloadType == matchCodec.PayloadType {
 						leftCodecs = append(leftCodecs[:leftCodecIdx], leftCodecs[leftCodecIdx+1:]...)
+						leftFmtp = append(leftFmtp[:leftCodecIdx], leftFmtp[leftCodecIdx+1:]...)
 
 						break
 					}
@@ -189,19 +192,20 @@ func (t *RTPTransceiver) setCodecPreferencesFromRemoteDescription(media *sdp.Med
 func matchCodecWithPayloadIdentity(
 	remoteCodec RTPCodecParameters,
 	localCodecs []RTPCodecParameters,
+	localFmtp []fmtp.FMTP,
 	offeredPayloads map[PayloadType]bool,
 ) (RTPCodecParameters, codecMatchType) {
-	matchCodec, matchType := codecParametersFuzzySearch(remoteCodec, localCodecs)
+	matchCodec, matchType := codecParametersFuzzySearchParsed(remoteCodec, localCodecs, localFmtp)
 	if matchType != codecMatchExact || matchCodec.PayloadType == remoteCodec.PayloadType ||
 		!offeredPayloads[matchCodec.PayloadType] {
 		return matchCodec, matchType
 	}
 
-	for _, codec := range localCodecs {
+	for i, codec := range localCodecs {
 		if codec.PayloadType != remoteCodec.PayloadType {
 			continue
 		}
-		_, identityMatch := codecParametersFuzzySearch(remoteCodec, []RTPCodecParameters{codec})
+		_, identityMatch := codecParametersFuzzySearchParsed(remoteCodec, localCodecs[i:i+1], localFmtp[i:i+1])
 		if identityMatch == codecMatchExact {
 			return codec, codecMatchExact
 		}
