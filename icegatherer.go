@@ -548,6 +548,11 @@ func (g *ICEGatherer) close(shouldGracefullyClose bool) error {
 	defer g.lock.Unlock()
 
 	if g.agent == nil {
+		// Closing is terminal even if no agent was ever created, otherwise a
+		// later Gather/GetLocalParameters/AddRemoteCandidate would create an
+		// agent that nothing closes.
+		g.setState(ICEGathererStateClosed)
+
 		return nil
 	}
 	if shouldGracefullyClose {

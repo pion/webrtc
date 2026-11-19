@@ -2372,6 +2372,10 @@ func (pc *PeerConnection) RemoteDescription() *SessionDescription {
 // AddICECandidate accepts an ICE candidate string and adds it
 // to the existing set of candidates.
 func (pc *PeerConnection) AddICECandidate(candidate ICECandidateInit) error {
+	if pc.isClosed.Load() {
+		return &rtcerr.InvalidStateError{Err: ErrConnectionClosed}
+	}
+
 	remoteDesc := pc.RemoteDescription()
 	if remoteDesc == nil {
 		return &rtcerr.InvalidStateError{Err: ErrNoRemoteDescription}
