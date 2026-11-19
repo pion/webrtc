@@ -1788,15 +1788,13 @@ func (pc *PeerConnection) cryptexModeFromSDP(parsed *sdp.SessionDescription) (sr
 			mode = srtp.CryptexModeDisabled
 		}
 	case RTPHeaderEncryptionPolicyRequire:
-		switch {
-		case !negotiatedForAllMedia:
+		if !negotiatedForAllMedia {
 			return srtp.CryptexModeDisabled, &rtcerr.InvalidAccessError{Err: ErrRTPHeaderEncryptionRequired}
-		case negotiatedForAnyMedia:
-			mode = srtp.CryptexModeRequired
-		default:
-			// This is case for data-only SDP with no session-level Cryptex attribute.
-			mode = srtp.CryptexModeDisabled
 		}
+		// An SDP with no active RTP m-line (for example, data-only SDP) is accepted without Cryptex,
+		// but must not relax the SRTP session: which m-lines are active is decided by the peer, and
+		// senders and receivers aren't stopped by a rejected or missing m-line.
+		mode = srtp.CryptexModeRequired
 	}
 
 	return mode, nil
