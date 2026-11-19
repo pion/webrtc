@@ -46,14 +46,16 @@ type SessionDescription struct {
 }
 
 // Unmarshal is a helper to deserialize the sdp.
+// It does not modify the SessionDescription, so it is safe to call
+// on a description that is owned by a PeerConnection.
 func (sd *SessionDescription) Unmarshal() (*sdp.SessionDescription, error) {
-	sd.parsed = &sdp.SessionDescription{}
-	err := sd.parsed.UnmarshalString(sd.SDP)
+	parsed := &sdp.SessionDescription{}
+	err := parsed.UnmarshalString(sd.SDP)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", ErrSDPUnmarshalling, err)
 	}
 
-	return sd.parsed, nil
+	return parsed, nil
 }
 
 func hasICETrickleOption(desc *sdp.SessionDescription) bool {

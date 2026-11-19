@@ -1245,9 +1245,11 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error {
 
 	isRenegotiation := pc.currentRemoteDescription != nil
 
-	if _, err := desc.Unmarshal(); err != nil {
-		return err
+	parsed, unmarshalErr := desc.Unmarshal()
+	if unmarshalErr != nil {
+		return unmarshalErr
 	}
+	desc.parsed = parsed
 
 	// Validate the Cryptex mode before committing any signaling state, so that a rejected
 	// description leaves the PeerConnection in its pre-call state (RFC 9429 Section 5.10).
