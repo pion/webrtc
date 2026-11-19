@@ -701,6 +701,9 @@ func (t *DTLSTransport) completeStart(dtlsConn *dtls.DetachedConn) error {
 	t.tlsVersion = fmt.Sprintf("%04X", connState.NegotiatedVersion())
 	t.dtlsCipher = connState.CipherSuiteID.String()
 	t.srtpCipher = ""
+	if err == nil && len(t.remoteCertificate) == 0 {
+		err = errNoRemoteCertificate
+	}
 	if err != nil {
 		return err
 	}
