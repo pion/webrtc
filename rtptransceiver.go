@@ -35,6 +35,7 @@ type RTPTransceiver struct {
 	// recently negotiated this transceiver's mid. It stays false until this transceiver has
 	// participated in a completed offer/answer exchange.
 	rtpHeaderEncryptionNegotiated atomic.Bool
+	stopped                       atomic.Bool
 
 	api *API
 	mu  sync.RWMutex
@@ -357,6 +358,12 @@ func (t *RTPTransceiver) setRTPHeaderEncryptionNegotiated(negotiated bool) {
 
 // Stop irreversibly stops the RTPTransceiver.
 func (t *RTPTransceiver) Stop() error {
+	t.stopped.Store(true)
+
+	return t.deactivate()
+}
+
+func (t *RTPTransceiver) deactivate() error {
 	if sender := t.Sender(); sender != nil {
 		if err := sender.Stop(); err != nil {
 			return err
@@ -387,10 +394,16 @@ func (t *RTPTransceiver) setReceiver(r *RTPReceiver) {
 }
 
 func (t *RTPTransceiver) setDirection(d RTPTransceiverDirection) {
+	if t.stopped.Load() {
+		d = RTPTransceiverDirectionInactive
+	}
 	t.direction.Store(d)
 }
 
 func (t *RTPTransceiver) setCurrentDirection(d RTPTransceiverDirection) {
+	if t.stopped.Load() {
+		d = RTPTransceiverDirectionInactive
+	}
 	t.currentDirection.Store(d)
 }
 
@@ -445,7 +458,7 @@ func (t *RTPTransceiver) setSendingTrack(track TrackLocal) error { //nolint:cycl
 }
 
 func (t *RTPTransceiver) isSendAllowed(kind RTPCodecType) bool {
-	if t.kind != kind || t.Sender() != nil {
+	if t.stopped.Load() || t.kind != kind || t.Sender() != nil {
 		return false
 	}
 

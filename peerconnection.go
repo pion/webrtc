@@ -1479,7 +1479,7 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error {
 			if transceiver == nil {
 				transceiver, localTransceivers = satisfyTypeAndDirection(kind, direction, localTransceivers)
 			} else if direction == RTPTransceiverDirectionInactive {
-				if err = transceiver.Stop(); err != nil {
+				if err = transceiver.deactivate(); err != nil {
 					return err
 				}
 			}
@@ -1513,6 +1513,8 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error {
 				pc.addRTPTransceiver(transceiver)
 				pc.mu.Unlock()
 
+			case transceiver.stopped.Load():
+				continue
 			case direction == RTPTransceiverDirectionRecvonly:
 				if transceiver.Direction() == RTPTransceiverDirectionSendrecv {
 					transceiver.setDirection(RTPTransceiverDirectionSendonly)
@@ -1963,6 +1965,9 @@ func (pc *PeerConnection) configureRTPReceivers(
 
 	if isRenegotiation { //nolint:nestif
 		for _, transceiver := range currentTransceivers {
+			if transceiver.stopped.Load() {
+				continue
+			}
 			receiver := transceiver.Receiver()
 			if receiver == nil {
 				continue
