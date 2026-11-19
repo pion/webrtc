@@ -31,6 +31,9 @@ type ICEGatherer struct {
 	agent           *ice.Agent
 	localParameters ICEParameters
 
+	// Stats taken just before the ICETransport closes the agent.
+	finalStats *iceAgentStats
+
 	onLocalCandidateHandler atomic.Value // func(candidate *ICECandidate)
 	onStateChangeHandler    atomic.Value // func(state ICEGathererState)
 
@@ -609,86 +612,119 @@ func (g *ICEGatherer) getAgent() *ice.Agent {
 }
 
 func (g *ICEGatherer) collectStats(collector *statsReportCollector, transportStatsID string) {
-	agent := g.getAgent()
+	g.lock.RLock()
+	agent := g.agent
+	finalStats := g.finalStats
+	g.lock.RUnlock()
+
+	if finalStats != nil {
+		finalStats.collect(collector, transportStatsID)
+
+		return
+	}
+
 	if agent == nil {
 		return
 	}
 
 	collector.Collecting()
 	go func(collector *statsReportCollector, agent *ice.Agent) {
-		for _, candidatePairStats := range agent.GetCandidatePairsStats() {
-			collector.Collecting()
-
-			stats, err := toICECandidatePairStats(candidatePairStats)
-			if err != nil {
-				g.log.Error(err.Error())
-				collector.Done()
-
-				continue
-			}
-			stats.TransportID = transportStatsID
-
-			collector.Collect(stats.ID, stats)
-		}
-
-		for _, candidateStats := range agent.GetLocalCandidatesStats() {
-			collector.Collecting()
-
-			networkType, err := getNetworkType(candidateStats.NetworkType)
-			if err != nil {
-				g.log.Error(err.Error())
-			}
-
-			candidateType, err := getCandidateType(candidateStats.CandidateType)
-			if err != nil {
-				g.log.Error(err.Error())
-			}
-
-			stats := ICECandidateStats{
-				Timestamp:     statsTimestampFrom(candidateStats.Timestamp),
-				ID:            candidateStats.ID,
-				TransportID:   transportStatsID,
-				Type:          StatsTypeLocalCandidate,
-				Address:       candidateStats.IP,
-				Port:          int32(candidateStats.Port), //nolint:gosec // G115, no overflow, port
-				Protocol:      networkType.Protocol(),
-				CandidateType: candidateType,
-				Priority:      int32(candidateStats.Priority), //nolint:gosec
-				URL:           candidateStats.URL,
-				RelayProtocol: candidateStats.RelayProtocol,
-			}
-			collector.Collect(stats.ID, stats)
-		}
-
-		for _, candidateStats := range agent.GetRemoteCandidatesStats() {
-			collector.Collecting()
-			networkType, err := getNetworkType(candidateStats.NetworkType)
-			if err != nil {
-				g.log.Error(err.Error())
-			}
-
-			candidateType, err := getCandidateType(candidateStats.CandidateType)
-			if err != nil {
-				g.log.Error(err.Error())
-			}
-
-			stats := ICECandidateStats{
-				Timestamp:     statsTimestampFrom(candidateStats.Timestamp),
-				ID:            candidateStats.ID,
-				TransportID:   transportStatsID,
-				Type:          StatsTypeRemoteCandidate,
-				Address:       candidateStats.IP,
-				Port:          int32(candidateStats.Port), //nolint:gosec // G115, no overflow, port
-				Protocol:      networkType.Protocol(),
-				CandidateType: candidateType,
-				Priority:      int32(candidateStats.Priority), //nolint:gosec // G115
-				URL:           candidateStats.URL,
-				RelayProtocol: candidateStats.RelayProtocol,
-			}
-			collector.Collect(stats.ID, stats)
-		}
+		g.agentStats(agent).collect(collector, transportStatsID)
 		collector.Done()
 	}(collector, agent)
+}
+
+// retainFinalStats stores the stats of the ICE agent so that they stay available after it is closed.
+// It must be called before the agent is closed.
+func (g *ICEGatherer) retainFinalStats() {
+	g.lock.RLock()
+	agent := g.agent
+	alreadyRetained := g.finalStats != nil
+	g.lock.RUnlock()
+
+	if agent == nil || alreadyRetained {
+		return
+	}
+
+	finalStats := g.agentStats(agent)
+
+	g.lock.Lock()
+	g.finalStats = finalStats
+	g.lock.Unlock()
+}
+
+// iceAgentStats holds the stats read from an ICE agent.
+type iceAgentStats struct {
+	candidatePairs []ICECandidatePairStats
+	candidates     []ICECandidateStats
+}
+
+func (s *iceAgentStats) collect(collector *statsReportCollector, transportStatsID string) {
+	for _, stats := range s.candidatePairs {
+		collector.Collecting()
+		stats.TransportID = transportStatsID
+		collector.Collect(stats.ID, stats)
+	}
+
+	for _, stats := range s.candidates {
+		collector.Collecting()
+		stats.TransportID = transportStatsID
+		collector.Collect(stats.ID, stats)
+	}
+}
+
+func (g *ICEGatherer) agentStats(agent *ice.Agent) *iceAgentStats {
+	agentStats := &iceAgentStats{}
+
+	for _, candidatePairStats := range agent.GetCandidatePairsStats() {
+		stats, err := toICECandidatePairStats(candidatePairStats)
+		if err != nil {
+			g.log.Error(err.Error())
+
+			continue
+		}
+
+		agentStats.candidatePairs = append(agentStats.candidatePairs, stats)
+	}
+
+	for _, candidateStats := range agent.GetLocalCandidatesStats() {
+		agentStats.candidates = append(
+			agentStats.candidates, g.toICECandidateStats(candidateStats, StatsTypeLocalCandidate),
+		)
+	}
+
+	for _, candidateStats := range agent.GetRemoteCandidatesStats() {
+		agentStats.candidates = append(
+			agentStats.candidates, g.toICECandidateStats(candidateStats, StatsTypeRemoteCandidate),
+		)
+	}
+
+	return agentStats
+}
+
+func (g *ICEGatherer) toICECandidateStats(candidateStats ice.CandidateStats, statsType StatsType) ICECandidateStats {
+	networkType, err := getNetworkType(candidateStats.NetworkType)
+	if err != nil {
+		g.log.Error(err.Error())
+	}
+
+	candidateType, err := getCandidateType(candidateStats.CandidateType)
+	if err != nil {
+		g.log.Error(err.Error())
+	}
+
+	return ICECandidateStats{
+		Timestamp:     statsTimestampFrom(candidateStats.Timestamp),
+		ID:            candidateStats.ID,
+		Type:          statsType,
+		Address:       candidateStats.IP,
+		Port:          int32(candidateStats.Port), //nolint:gosec // G115, no overflow, port
+		Protocol:      networkType.Protocol(),
+		CandidateType: candidateType,
+		Priority:      int32(candidateStats.Priority), //nolint:gosec // G115
+		URL:           candidateStats.URL,
+		RelayProtocol: candidateStats.RelayProtocol,
+	}
 }
 
 func (g *ICEGatherer) getSelectedCandidatePairStats() (ICECandidatePairStats, bool) {
