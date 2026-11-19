@@ -1107,6 +1107,69 @@ func TestPeerConnection_Renegotiation_Simulcast(t *testing.T) {
 	})
 }
 
+func TestPeerConnection_RejectedVideoLeavesAudioUsable(t *testing.T) {
+	lim := test.TimeOut(15 * time.Second)
+	defer lim.Stop()
+
+	audioCodec := RTPCodecCapability{MimeType: MimeTypeOpus, ClockRate: 48000, Channels: 2}
+	newPeer := func(videoMimeType string) *PeerConnection {
+		mediaEngine := &MediaEngine{}
+		require.NoError(t, mediaEngine.RegisterCodec(
+			RTPCodecParameters{RTPCodecCapability: audioCodec, PayloadType: 111}, RTPCodecTypeAudio,
+		))
+		require.NoError(t, mediaEngine.RegisterCodec(RTPCodecParameters{
+			RTPCodecCapability: RTPCodecCapability{MimeType: videoMimeType, ClockRate: 90000},
+			PayloadType:        96,
+		}, RTPCodecTypeVideo))
+		peer, err := NewAPI(WithMediaEngine(mediaEngine)).NewPeerConnection(Configuration{})
+		require.NoError(t, err)
+
+		return peer
+	}
+	offerer, answerer := newPeer(MimeTypeVP9), newPeer(MimeTypeVP8)
+	defer closePairNow(t, offerer, answerer)
+
+	recvOnly := RTPTransceiverInit{Direction: RTPTransceiverDirectionRecvonly}
+	_, err := offerer.AddTransceiverFromKind(RTPCodecTypeAudio, recvOnly)
+	require.NoError(t, err)
+	videoReceiver, err := offerer.AddTransceiverFromKind(RTPCodecTypeVideo, recvOnly)
+	require.NoError(t, err)
+
+	audioTrack, err := NewTrackLocalStaticRTP(audioCodec, "audio", "stream")
+	require.NoError(t, err)
+	videoTrack, err := NewTrackLocalStaticRTP(RTPCodecCapability{MimeType: MimeTypeVP8}, "video", "stream")
+	require.NoError(t, err)
+	sendOnly := RTPTransceiverInit{Direction: RTPTransceiverDirectionSendonly}
+	_, err = answerer.AddTransceiverFromTrack(audioTrack, sendOnly)
+	require.NoError(t, err)
+	videoSender, err := answerer.AddTransceiverFromTrack(videoTrack, sendOnly)
+	require.NoError(t, err)
+
+	incoming := make(chan *TrackRemote, 1)
+	offerer.OnTrack(func(track *TrackRemote, _ *RTPReceiver) { incoming <- track })
+	connected := untilConnectionState(PeerConnectionStateConnected, offerer, answerer)
+	require.NoError(t, signalPair(offerer, answerer))
+	assert.Contains(t, answerer.LocalDescription().SDP, "m=video 0 ")
+	assert.Contains(t, answerer.LocalDescription().SDP, "a=inactive")
+	assert.False(t, videoSender.Sender().hasSent())
+	<-connected
+	offerer.ops.Done()
+
+	payload := []byte{0xf8, 0xff, 0xfe}
+	require.NoError(t, audioTrack.WriteRTP(&rtp.Packet{Header: rtp.Header{Version: 2}, Payload: payload}))
+	track := <-incoming
+	pkt, _, err := track.ReadRTP()
+	require.NoError(t, err)
+	assert.Equal(t, payload, pkt.Payload)
+
+	laterTrack, err := NewTrackLocalStaticRTP(RTPCodecCapability{MimeType: MimeTypeVP9}, "video", "stream")
+	require.NoError(t, err)
+	sender, err := offerer.AddTrack(laterTrack)
+	require.NoError(t, err)
+	assert.Same(t, sender, videoReceiver.Sender())
+	assert.Len(t, offerer.GetTransceivers(), 2)
+}
+
 func TestPeerConnection_Regegotiation_ReuseTransceiver(t *testing.T) {
 	lim := test.TimeOut(time.Second * 30)
 	defer lim.Stop()

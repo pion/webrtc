@@ -580,6 +580,26 @@ func addSenderSDP(
 	}
 }
 
+// hasCommonCodec checks the codecs from one offered media section.
+func hasCommonCodec(media *sdp.MediaDescription, codecs []RTPCodecParameters) bool {
+	offered, err := codecsFromMediaDescription(media)
+	if err != nil {
+		return false
+	}
+
+	offeredFMTPs := parseCodecFMTPs(offered)
+	for _, codec := range codecs {
+		if strings.EqualFold(codec.MimeType, MimeTypeRTX) {
+			continue
+		}
+		if _, match := codecParametersFuzzySearchParsed(codec, offered, offeredFMTPs); match != codecMatchNone {
+			return true
+		}
+	}
+
+	return false
+}
+
 //nolint:cyclop
 func addTransceiverSDP(
 	descr *sdp.SessionDescription,
@@ -609,6 +629,9 @@ func addTransceiverSDP(
 		WithPropertyAttribute(sdp.AttrKeyRTCPRsize)
 
 	codecs := transceiver.getCodecs()
+	if mediaSection.remoteOffer != nil && !hasCommonCodec(mediaSection.remoteOffer, codecs) {
+		codecs = nil
+	}
 	for _, codec := range codecs {
 		name := strings.TrimPrefix(codec.MimeType, "audio/")
 		name = strings.TrimPrefix(name, "video/")
@@ -624,7 +647,7 @@ func addTransceiverSDP(
 	}
 	if len(codecs) == 0 {
 		// If we are sender and we have no codecs throw an error early
-		if transceiver.Sender() != nil {
+		if mediaSection.remoteOffer == nil && transceiver.Sender() != nil {
 			return false, ErrSenderWithNoCodecs
 		}
 
@@ -636,6 +659,10 @@ func addTransceiverSDP(
 		// In addition this makes our SDP compliant with RFC 4566 Section 5.7:
 		// https://datatracker.ietf.org/doc/html/rfc4566#section-5.7
 		descr.WithMedia(&sdp.MediaDescription{
+			Attributes: []sdp.Attribute{
+				{Key: sdp.AttrKeyMID, Value: midValue},
+				{Key: sdp.AttrKeyInactive},
+			},
 			MediaName: sdp.MediaName{
 				Media:   transceiver.kind.String(),
 				Port:    sdp.RangedPort{Value: 0},
@@ -723,6 +750,7 @@ type simulcastRid struct {
 }
 
 type mediaSection struct {
+	remoteOffer     *sdp.MediaDescription
 	id              string
 	transceivers    []*RTPTransceiver
 	data            bool

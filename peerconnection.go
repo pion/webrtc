@@ -1186,7 +1186,15 @@ func (pc *PeerConnection) SetLocalDescription(desc SessionDescription) error {
 	remoteDesc := pc.RemoteDescription()
 	if weAnswer && remoteDesc != nil {
 		_ = setRTPTransceiverCurrentDirection(&desc, currentTransceivers, false)
-		if err := pc.startRTPSenders(currentTransceivers); err != nil {
+
+		// Senders on rejected sections have no negotiated codec to bind.
+		rejectedMIDs := make(map[string]bool)
+		for _, media := range desc.parsed.MediaDescriptions {
+			if _, bundleOnly := media.Attribute("bundle-only"); media.MediaName.Port.Value == 0 && !bundleOnly {
+				rejectedMIDs[getMidValue(media)] = true
+			}
+		}
+		if err := pc.startRTPSenders(currentTransceivers, rejectedMIDs); err != nil {
 			return err
 		}
 		pc.configureRTPReceivers(haveLocalDescription, remoteDesc, currentTransceivers)
@@ -1425,7 +1433,7 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error {
 	if isRenegotiation {
 		if weOffer {
 			_ = setRTPTransceiverCurrentDirection(&desc, currentTransceivers, true)
-			if err = pc.startRTPSenders(currentTransceivers); err != nil {
+			if err = pc.startRTPSenders(currentTransceivers, nil); err != nil {
 				return err
 			}
 			pc.configureRTPReceivers(true, &desc, currentTransceivers)
@@ -1466,7 +1474,7 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error {
 	// the connection is actually established.
 	if weOffer {
 		_ = setRTPTransceiverCurrentDirection(&desc, currentTransceivers, true)
-		if err := pc.startRTPSenders(currentTransceivers); err != nil {
+		if err := pc.startRTPSenders(currentTransceivers, nil); err != nil {
 			return err
 		}
 
@@ -1957,9 +1965,13 @@ func (pc *PeerConnection) startRTPReceivers(remoteDesc *SessionDescription, curr
 	}
 }
 
-// startRTPSenders starts all outbound RTP streams.
-func (pc *PeerConnection) startRTPSenders(currentTransceivers []*RTPTransceiver) error {
+// startRTPSenders starts outbound RTP streams for the sections accepted by the local description.
+func (pc *PeerConnection) startRTPSenders(currentTransceivers []*RTPTransceiver, rejectedMIDs map[string]bool) error {
 	for _, transceiver := range currentTransceivers {
+		if rejectedMIDs[transceiver.Mid()] {
+			continue
+		}
+
 		if sender := transceiver.Sender(); sender != nil && sender.isNegotiated() && !sender.hasSent() &&
 			!sender.hasStopped() {
 			err := sender.Send(sender.GetParameters())
@@ -3406,6 +3418,11 @@ func (pc *PeerConnection) generateMatchedSDP(
 			continue
 		}
 
+		var remoteOffer *sdp.MediaDescription
+		if !includeUnmatched {
+			remoteOffer = media
+		}
+
 		sdpSemantics := pc.configuration.SDPSemantics
 
 		switch {
@@ -3437,6 +3454,7 @@ func (pc *PeerConnection) generateMatchedSDP(
 			}
 			mediaSections = append(mediaSections, mediaSection{
 				id:           midValue,
+				remoteOffer:  remoteOffer,
 				transceivers: mediaTransceivers,
 				cryptex:      cryptexAtMediaLevel,
 			})
@@ -3463,6 +3481,7 @@ func (pc *PeerConnection) generateMatchedSDP(
 				mediaSections,
 				mediaSection{
 					id:              midValue,
+					remoteOffer:     remoteOffer,
 					transceivers:    mediaTransceivers,
 					matchExtensions: extensions,
 					rids:            getRids(media),
