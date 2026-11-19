@@ -1374,9 +1374,11 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error {
 		return &rtcerr.InvalidStateError{Err: ErrConnectionClosed}
 	}
 
-	if _, err := desc.Unmarshal(); err != nil {
-		return err
+	parsed, unmarshalErr := desc.Unmarshal()
+	if unmarshalErr != nil {
+		return unmarshalErr
 	}
+	desc.parsed = parsed
 
 	if err := pc.validateRemoteDescription(&desc); err != nil {
 		return err
