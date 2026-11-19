@@ -2472,6 +2472,10 @@ func (pc *PeerConnection) AddICECandidate(candidate ICECandidateInit) error { //
 	pc.mu.Lock()
 	defer pc.mu.Unlock()
 
+	if pc.isClosed.Load() {
+		return &rtcerr.InvalidStateError{Err: ErrConnectionClosed}
+	}
+
 	remoteDesc := pc.currentRemoteDescription
 	if pc.pendingRemoteDescription != nil {
 		remoteDesc = pc.pendingRemoteDescription
