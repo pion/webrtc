@@ -239,6 +239,7 @@ var (
 	errPeerConnSimulcastMidRTPExtensionRequired      = errors.New("mid RTP Extensions required for Simulcast")
 	errPeerConnSimulcastStreamIDRTPExtensionRequired = errors.New("stream id RTP Extensions required for Simulcast")
 	errPeerConnSimulcastIncomingSSRCFailed           = errors.New("incoming SSRC failed Simulcast probing")
+	errPeerConnSimulcastRidNotOffered                = errors.New("answer contains a simulcast rid that was not offered")
 	errPeerConnAddTransceiverFromKindOnlyAcceptsOne  = errors.New(
 		"AddTransceiverFromKind only accepts one RTPTransceiverInit",
 	)

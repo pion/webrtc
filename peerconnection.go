@@ -1258,9 +1258,20 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error {
 	// description leaves the PeerConnection in its pre-call state (RFC 9429 Section 5.10).
 	pc.mu.Lock()
 	localCryptexMode, remoteCryptexMode, cryptexErr := pc.getCryptexModes(desc.parsed)
+	localDesc := pc.currentLocalDescription
+	if pc.pendingLocalDescription != nil {
+		localDesc = pc.pendingLocalDescription
+	}
 	pc.mu.Unlock()
 	if cryptexErr != nil {
 		return cryptexErr
+	}
+
+	// An answer can only keep or drop the simulcast rids of our offer, it cannot add any.
+	if (desc.Type == SDPTypeAnswer || desc.Type == SDPTypePranswer) && localDesc != nil && localDesc.parsed != nil {
+		if err := checkAnswerRids(localDesc.parsed, desc.parsed); err != nil {
+			return &rtcerr.InvalidAccessError{Err: err}
+		}
 	}
 
 	if err := pc.setDescription(&desc, stateChangeOpSetRemote); err != nil {
