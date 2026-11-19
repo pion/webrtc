@@ -585,7 +585,6 @@ func (pc *PeerConnection) SetConfiguration(configuration Configuration) error { 
 		if configuration.PeerIdentity != pc.configuration.PeerIdentity {
 			return &rtcerr.InvalidModificationError{Err: ErrModifyingPeerIdentity}
 		}
-		pc.configuration.PeerIdentity = configuration.PeerIdentity
 	}
 
 	// https://www.w3.org/TR/webrtc/#set-the-configuration (step #3.1 - #3.3)
@@ -1372,6 +1371,10 @@ func (pc *PeerConnection) validateRemoteDescription(desc *SessionDescription) er
 func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error {
 	if pc.isClosed.Load() {
 		return &rtcerr.InvalidStateError{Err: ErrConnectionClosed}
+	}
+
+	if pc.configuration.PeerIdentity != "" {
+		return &rtcerr.NotSupportedError{Err: errIdentityProviderNotImplemented}
 	}
 
 	parsed, unmarshalErr := desc.Unmarshal()
