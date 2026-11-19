@@ -257,11 +257,20 @@ func (r *RTPReceiver) Receive(parameters RTPReceiveParameters) error {
 func (r *RTPReceiver) Read(b []byte) (n int, a interceptor.Attributes, err error) {
 	select {
 	case <-r.received:
-		if len(r.tracks) > 1 {
+		r.mu.RLock()
+		if len(r.tracks) == 0 || r.tracks[0].track == nil {
+			r.mu.RUnlock()
+
+			return 0, nil, errRTPReceiverForRIDTrackStreamNotFound
+		}
+		rid := r.tracks[0].track.RID()
+		isSimulcast := len(r.tracks) > 1
+		r.mu.RUnlock()
+		if isSimulcast {
 			r.log.Errorf(useReadSimulcast)
 		}
 
-		return r.ReadSimulcast(b, r.tracks[0].track.RID())
+		return r.ReadSimulcast(b, rid)
 	case <-r.closedChan:
 		return 0, nil, io.ErrClosedPipe
 	}
@@ -277,8 +286,14 @@ func (r *RTPReceiver) ReadSimulcast(b []byte, rid string) (n int, a interceptor.
 					return 0, nil, err
 				}
 				r.mu.RLock()
-				reader := r.streamsForTrack(track).rtcpInterceptor
+				var reader interceptor.RTCPReader
+				if streams := r.streamsForTrack(track); streams != nil {
+					reader = streams.rtcpInterceptor
+				}
 				r.mu.RUnlock()
+				if reader == nil {
+					break
+				}
 
 				return reader.Read(b, a)
 			}
@@ -697,6 +712,11 @@ func (t *trackStreams) setRTX() error {
 // SetReadDeadline sets the max amount of time the RTCP stream will block before returning. 0 is forever.
 func (r *RTPReceiver) SetReadDeadline(t time.Time) error {
 	r.mu.RLock()
+	if len(r.tracks) == 0 || r.tracks[0].track == nil {
+		r.mu.RUnlock()
+
+		return errRTPReceiverForRIDTrackStreamNotFound
+	}
 	rid := r.tracks[0].track.RID()
 	r.mu.RUnlock()
 
@@ -718,7 +738,9 @@ func (r *RTPReceiver) SetReadDeadlineSimulcast(deadline time.Time, rid string) e
 				}
 			}
 
-			return t.rtcpReadStream.SetReadDeadline(deadline)
+			if t.rtcpReadStream != nil {
+				return t.rtcpReadStream.SetReadDeadline(deadline)
+			}
 		}
 	}
 
@@ -754,7 +776,9 @@ func (r *RTPReceiver) setRTPReadDeadline(deadline time.Time, reader *TrackRemote
 			}
 		}
 
-		return t.rtpReader.readStream.SetReadDeadline(deadline)
+		if t.rtpReader != nil {
+			return t.rtpReader.readStream.SetReadDeadline(deadline)
+		}
 	}
 
 	return fmt.Errorf("%w: %d", errRTPReceiverWithSSRCTrackStreamNotFound, reader.SSRC())
