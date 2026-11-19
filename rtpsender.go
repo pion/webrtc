@@ -244,6 +244,11 @@ func (r *RTPSender) ReplaceTrack(track TrackLocal) error { //nolint:cyclop
 		return ErrRTPSenderNewTrackHasIncorrectEnvelope
 	}
 
+	// Stop only unbinds once, a track bound after it would never be released
+	if track != nil && r.hasStopped() {
+		return errRTPSenderStopped
+	}
+
 	var replacedTrack TrackLocal
 	var context *baseTrackLocalContext
 	for _, e := range r.trackEncodings {
@@ -310,6 +315,9 @@ func (r *RTPSender) Send(parameters RTPSendParameters) error {
 		return errRTPSenderSendAlreadyCalled
 	case r.trackEncodings[0].track == nil:
 		return errRTPSenderTrackRemoved
+	case r.hasStopped():
+		// Stop only unbinds once, a track bound after it would never be released
+		return errRTPSenderStopped
 	}
 
 	for idx := range r.trackEncodings {

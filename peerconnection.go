@@ -2068,7 +2068,8 @@ func (pc *PeerConnection) startRTPSenders(currentTransceivers []*RTPTransceiver)
 		if direction == RTPTransceiverDirectionInactive || direction == RTPTransceiverDirectionRecvonly {
 			continue
 		}
-		if sender := transceiver.Sender(); sender != nil && sender.isNegotiated() && !sender.hasSent() {
+		if sender := transceiver.Sender(); sender != nil && sender.isNegotiated() && !sender.hasSent() &&
+			!sender.hasStopped() {
 			err := sender.Send(sender.GetParameters())
 			if err != nil {
 				return err

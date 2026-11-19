@@ -179,6 +179,10 @@ func (r *RTPReceiver) startReceive(parameters RTPReceiveParameters) error { //no
 	default:
 	}
 
+	if r.haveClosed() {
+		return io.EOF
+	}
+
 	globalParams := r.getParameters()
 	codec := RTPCodecCapability{}
 	if len(globalParams.Codecs) != 0 {
