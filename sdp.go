@@ -1141,12 +1141,19 @@ func codecsFromMediaDescription(mediaDescr *sdp.MediaDescription) (out []RTPCode
 		MediaDescriptions: []*sdp.MediaDescription{mediaDescr},
 	}
 	codecMap := s.GetCodecMap()
+	seenPayloadTypes := map[uint8]struct{}{}
 
 	for _, payloadStr := range mediaDescr.MediaName.Formats {
 		payloadType, err := strconv.ParseUint(payloadStr, 10, 8)
 		if err != nil {
 			return nil, err
 		}
+
+		// A payload type identifies a single codec no matter how often the m= line repeats it.
+		if _, ok := seenPayloadTypes[uint8(payloadType)]; ok {
+			continue
+		}
+		seenPayloadTypes[uint8(payloadType)] = struct{}{}
 
 		codec, ok := codecMap[uint8(payloadType)]
 		if !ok {
