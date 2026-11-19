@@ -19,6 +19,7 @@ import (
 	"github.com/pion/ice/v4"
 	"github.com/pion/logging"
 	"github.com/pion/sdp/v3"
+	"github.com/pion/webrtc/v4/internal/fmtp"
 )
 
 // trackDetails represents any media source that can be represented in a SDP
@@ -1198,6 +1199,17 @@ func codecsFromMediaDescription(mediaDescr *sdp.MediaDescription) (out []RTPCode
 			return nil, fmt.Errorf("%w: payload type %d", errSDPPayloadTypeNotFound, payloadType)
 		}
 
+		mimeType := mediaDescr.MediaName.Media + "/" + codec.Name
+
+		// A missing clock rate (VP8/0, or no rate at all) is matched as the
+		// codec's default one, see fmtp.ClockRateEqual. Store the default as
+		// well, otherwise zero becomes the negotiated clock rate and is handed
+		// to senders and tracks.
+		clockRate := codec.ClockRate
+		if clockRate == 0 {
+			clockRate = fmtp.DefaultClockRate(mimeType)
+		}
+
 		channels := uint16(0)
 		val, err := strconv.ParseUint(codec.EncodingParameters, 10, 16)
 		if err == nil {
@@ -1217,8 +1229,8 @@ func codecsFromMediaDescription(mediaDescr *sdp.MediaDescription) (out []RTPCode
 
 		out = append(out, RTPCodecParameters{
 			RTPCodecCapability: RTPCodecCapability{
-				mediaDescr.MediaName.Media + "/" + codec.Name,
-				codec.ClockRate,
+				mimeType,
+				clockRate,
 				channels,
 				codec.Fmtp,
 				feedback,
