@@ -161,15 +161,21 @@ func (t *DTLSTransport) ICETransport() *ICETransport {
 	return t.iceTransport
 }
 
-// onStateChange requires the caller holds the lock.
+// onStateChange notifies handlers after the state has been published.
 func (t *DTLSTransport) onStateChange(state DTLSTransportState) {
-	t.state = state
-	handler := t.onStateChangeHandler
+	t.lock.RLock()
+	current := t.state
+	handler, internalHandler := t.onStateChangeHandler, t.internalOnStateChangeHandler
+	t.lock.RUnlock()
+
+	if current != state {
+		return
+	}
 	if handler != nil {
 		handler(state)
 	}
-	if handler := t.internalOnStateChangeHandler; handler != nil {
-		handler(state)
+	if internalHandler != nil && t.State() == state {
+		internalHandler(state)
 	}
 }
 
@@ -439,8 +445,13 @@ func (t *DTLSTransport) start(
 	t.remoteCertificateStats = nil
 	t.setLocalCertificateStats()
 	conn, cert, role := t.conn, t.certificates[0], t.roleLocked()
-	t.onStateChange(DTLSTransportStateConnecting)
+	t.state = DTLSTransportStateConnecting
 	t.lock.Unlock()
+
+	t.onStateChange(DTLSTransportStateConnecting)
+	if t.State() != DTLSTransportStateConnecting {
+		return io.ErrClosedPipe
+	}
 
 	ctx := context.Background()
 	if newContext != nil {
@@ -486,14 +497,19 @@ func (t *DTLSTransport) start(
 				go func() {
 					<-startFinished.Done()
 					t.lock.Lock()
-					defer t.lock.Unlock()
-					if t.state == DTLSTransportStateConnected {
-						state := DTLSTransportStateClosed
-						if err != nil && !errors.Is(err, dtls.ErrConnClosed) && !errors.Is(err, io.EOF) {
-							state = DTLSTransportStateFailed
-						}
-						t.onStateChange(state)
+					if t.state != DTLSTransportStateConnected || t.conn != conn {
+						t.lock.Unlock()
+
+						return
 					}
+					state := DTLSTransportStateClosed
+					if err != nil && !errors.Is(err, dtls.ErrConnClosed) && !errors.Is(err, io.EOF) {
+						state = DTLSTransportStateFailed
+					}
+					t.state = state
+					t.lock.Unlock()
+
+					t.onStateChange(state)
 				}()
 			},
 		})
@@ -699,13 +715,15 @@ func (t *DTLSTransport) completeStart(dtlsConn *dtls.DetachedConn) error {
 	srtpProtectionProfile, err := srtpProtectionProfileFromDTLSConn(dtlsConn)
 
 	t.lock.Lock()
-	defer t.lock.Unlock()
+	if t.state != DTLSTransportStateConnecting {
+		t.lock.Unlock()
 
-	if t.state == DTLSTransportStateClosed {
 		return io.ErrClosedPipe
 	}
 	connState, ok := dtlsConn.ConnectionState()
 	if !ok { // never fire in practice.
+		t.lock.Unlock()
+
 		return fmt.Errorf("%w: Failed to get DTLS ConnectionState", errDtlsKeyExtractionFailed)
 	}
 	t.tlsVersion = fmt.Sprintf("%04X", connState.NegotiatedVersion())
@@ -715,6 +733,8 @@ func (t *DTLSTransport) completeStart(dtlsConn *dtls.DetachedConn) error {
 		err = errNoRemoteCertificate
 	}
 	if err != nil {
+		t.lock.Unlock()
+
 		return err
 	}
 	t.srtpProtectionProfile = srtpProtectionProfile
@@ -723,10 +743,14 @@ func (t *DTLSTransport) completeStart(dtlsConn *dtls.DetachedConn) error {
 	t.srtpCanStart = true
 	if t.srtpWanted {
 		if err = t.startSRTP(&connState); err != nil {
+			t.lock.Unlock()
+
 			return err
 		}
 	}
 	t.setRemoteCertificateStats()
+	t.state = DTLSTransportStateConnected
+	t.lock.Unlock()
 	t.onStateChange(DTLSTransportStateConnected)
 
 	return nil
@@ -760,10 +784,14 @@ func (t *DTLSTransport) failStart(err error) error {
 	t.lock.Lock()
 	conn := t.conn
 	t.conn, t.dtlsConn = nil, nil
-	if t.state != DTLSTransportStateClosed {
-		t.onStateChange(DTLSTransportStateFailed)
+	notify := t.state != DTLSTransportStateClosed
+	if notify {
+		t.state = DTLSTransportStateFailed
 	}
 	t.lock.Unlock()
+	if notify {
+		t.onStateChange(DTLSTransportStateFailed)
+	}
 	if conn != nil {
 		_ = conn.Close()
 	}
@@ -801,7 +829,8 @@ func (t *DTLSTransport) Stop() error {
 	conn := t.conn
 	simulcastStreams := t.simulcastStreams
 	t.simulcastStreams = nil
-	t.onStateChange(DTLSTransportStateClosed)
+	notify := t.state != DTLSTransportStateClosed
+	t.state = DTLSTransportStateClosed
 	t.lock.Unlock()
 	if t.iceTransport != nil {
 		t.iceTransport.notifyConnectionChanged()
@@ -825,9 +854,12 @@ func (t *DTLSTransport) Stop() error {
 
 	if conn != nil {
 		// dtls connection may be closed on sctp close.
-		if err := conn.Close(); err != nil && !errors.Is(err, dtls.ErrConnClosed) {
+		if err := conn.Close(); !errors.Is(err, dtls.ErrConnClosed) {
 			closeErrs = append(closeErrs, err)
 		}
+	}
+	if notify {
+		t.onStateChange(DTLSTransportStateClosed)
 	}
 
 	return errors.Join(closeErrs...)
