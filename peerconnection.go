@@ -1242,7 +1242,7 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error {
 		return &rtcerr.InvalidStateError{Err: ErrConnectionClosed}
 	}
 
-	isRenegotiation := pc.currentRemoteDescription != nil
+	isRenegotiation := pc.CurrentRemoteDescription() != nil
 
 	if pc.configuration.PeerIdentity != "" {
 		return &rtcerr.NotSupportedError{Err: errIdentityProviderNotImplemented}
@@ -1275,6 +1275,11 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error {
 		if err := checkAnswerRids(localDesc.parsed, desc.parsed); err != nil {
 			return &rtcerr.InvalidAccessError{Err: err}
 		}
+	}
+
+	if dtlsRole := pc.api.settingEngine.answeringDTLSRole; desc.Type == SDPTypeOffer &&
+		!isRenegotiation && dtlsRole == dtlsRoleFromSDP(desc.parsed) {
+		return &rtcerr.InvalidAccessError{Err: errPeerConnRemoteOfferDTLSRoleConflict}
 	}
 
 	if err := pc.setDescription(&desc, stateChangeOpSetRemote); err != nil {

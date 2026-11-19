@@ -405,6 +405,8 @@ func (e *SettingEngine) SetIncludeLoopbackCandidate(include bool) {
 // DTLSRolePassive:
 //
 //	Act as DTLS Server, wait for ClientHello
+//
+// Offers that require the opposite local role are rejected.
 func (e *SettingEngine) SetAnsweringDTLSRole(role DTLSRole) error {
 	if role != DTLSRoleClient && role != DTLSRoleServer {
 		return errSettingEngineSetAnsweringDTLSRole
