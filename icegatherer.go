@@ -7,6 +7,7 @@ package webrtc
 
 import (
 	"fmt"
+	"slices"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -291,7 +292,10 @@ func (g *ICEGatherer) miscOptions() []ice.AgentOption {
 		opts = append(opts, ice.WithIncludeLoopback())
 	}
 
-	if g.api.settingEngine.iceDisableActiveTCP {
+	// Active TCP creates host candidates outside Gather.
+	candidateTypes := g.resolveCandidateTypes()
+	excludesHost := len(candidateTypes) > 0 && !slices.Contains(candidateTypes, ice.CandidateTypeHost)
+	if g.api.settingEngine.iceDisableActiveTCP || excludesHost {
 		opts = append(opts, ice.WithDisableActiveTCP())
 	}
 
