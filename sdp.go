@@ -626,6 +626,26 @@ func addSenderSDP(
 	}
 }
 
+// hasCommonCodec checks the codecs from one offered media section.
+func hasCommonCodec(media *sdp.MediaDescription, codecs []RTPCodecParameters) bool {
+	offered, err := codecsFromMediaDescription(media)
+	if err != nil {
+		return false
+	}
+
+	offeredFMTPs := parseCodecFMTPs(offered)
+	for _, codec := range codecs {
+		if strings.EqualFold(codec.MimeType, MimeTypeRTX) {
+			continue
+		}
+		if _, match := codecParametersFuzzySearchParsed(codec, offered, offeredFMTPs); match != codecMatchNone {
+			return true
+		}
+	}
+
+	return false
+}
+
 //nolint:cyclop
 func addTransceiverSDP(
 	descr *sdp.SessionDescription,
@@ -645,9 +665,12 @@ func addTransceiverSDP(
 	transceiver := transceivers[0]
 	media := sdp.NewJSEPMediaDescription(transceiver.kind.String(), nil)
 	codecs := transceiver.getCodecs()
+	if mediaSection.remoteOffer != nil && !hasCommonCodec(mediaSection.remoteOffer, codecs) {
+		codecs = nil
+	}
 	if len(codecs) == 0 {
-		// If we are sender and we have no codecs throw an error early
-		if transceiver.Sender() != nil {
+		// A new offer needs codecs for each sender.
+		if mediaSection.remoteOffer == nil && transceiver.Sender() != nil {
 			return false, ErrSenderWithNoCodecs
 		}
 
@@ -744,6 +767,7 @@ type simulcastRid struct {
 }
 
 type mediaSection struct {
+	remoteOffer     *sdp.MediaDescription
 	id              string
 	transceivers    []*RTPTransceiver
 	data            bool

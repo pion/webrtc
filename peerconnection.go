@@ -3475,12 +3475,17 @@ func (pc *PeerConnection) generateMatchedSDP(
 			sender.setNegotiated()
 		}
 		mediaTransceivers := []*RTPTransceiver{transceiver}
+		var remoteOffer *sdp.MediaDescription
+		if !includeUnmatched {
+			remoteOffer = media
+		}
 
 		extensions, _ := rtpExtensionsFromMediaDescription(media)
 		mediaSections = append(
 			mediaSections,
 			mediaSection{
 				id:              midValue,
+				remoteOffer:     remoteOffer,
 				transceivers:    mediaTransceivers,
 				matchExtensions: extensions,
 				rids:            getRids(media),
