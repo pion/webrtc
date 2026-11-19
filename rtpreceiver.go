@@ -412,10 +412,12 @@ func (r *RTPReceiver) Stop() error { //nolint:cyclop
 
 			if r.tracks[i].rtpReadStream != nil {
 				errs = append(errs, r.tracks[i].rtpReadStream.Close())
+				r.transport.removeSimulcastStream(r.tracks[i].rtpReadStream)
 			}
 
 			if r.tracks[i].repairReadStream != nil {
 				errs = append(errs, r.tracks[i].repairReadStream.Close())
+				r.transport.removeSimulcastStream(r.tracks[i].repairReadStream)
 			}
 
 			if r.tracks[i].repairRtcpReadStream != nil {
