@@ -8,6 +8,10 @@ import (
 )
 
 func profileLevelIDMatches(a, b string) bool {
+	if len(a) > 6 || len(b) > 6 {
+		return false
+	}
+
 	aa, err := hex.DecodeString(a)
 	if err != nil || len(aa) < 2 {
 		return false
