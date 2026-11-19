@@ -1905,16 +1905,20 @@ func (pc *PeerConnection) startRTPReceivers(remoteDesc *SessionDescription, curr
 
 	if remoteIsPlanB {
 		for _, incomingTrack := range unhandledTracks {
-			t, err := pc.AddTransceiverFromKind(incomingTrack.kind, RTPTransceiverInit{
+			transceiver, err := pc.AddTransceiverFromKind(incomingTrack.kind, RTPTransceiverInit{
 				Direction: RTPTransceiverDirectionSendrecv,
 			})
 			if err != nil {
-				pc.log.Warnf("Could not add transceiver for remote SSRC %d: %s", incomingTrack.ssrcs[0], err)
+				// A track described by rid only has no SSRCs, so don't index into them.
+				pc.log.Warnf(
+					"Could not add transceiver for remote track (mid %q, SSRCs %v, RIDs %v): %s",
+					incomingTrack.mid, incomingTrack.ssrcs, incomingTrack.rids, err,
+				)
 
 				continue
 			}
-			pc.configureReceiver(incomingTrack, t.Receiver())
-			pc.startReceiver(incomingTrack, t.Receiver())
+			pc.configureReceiver(incomingTrack, transceiver.Receiver())
+			pc.startReceiver(incomingTrack, transceiver.Receiver())
 		}
 	}
 }
