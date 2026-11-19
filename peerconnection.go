@@ -1421,6 +1421,11 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error {
 	if restartErr != nil {
 		return &rtcerr.OperationError{Err: restartErr}
 	}
+	if dtlsRole := pc.api.settingEngine.answeringDTLSRole; desc.Type == SDPTypeOffer &&
+		(!isRenegotiation || restartDTLS) && dtlsRole == dtlsRoleFromSDP(desc.parsed) {
+		return &rtcerr.InvalidAccessError{Err: errPeerConnRemoteOfferDTLSRoleConflict}
+	}
+
 	if err = pc.setDescription(&desc, stateChangeOpSetRemote); err != nil {
 		return err
 	}

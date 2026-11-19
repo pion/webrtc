@@ -232,7 +232,11 @@ var (
 	errPeerConnStateChangeInvalid                     = errors.New("invalid state change op")
 	errPeerConnStateChangeUnhandled                   = errors.New("unhandled state change op")
 	errPeerConnSDPTypeInvalidValueSetLocalDescription = errors.New("invalid SDP type supplied to SetLocalDescription()")
-	errPeerConnRemoteDescriptionWithoutMidValue       = errors.New(
+
+	errPeerConnRemoteOfferDTLSRoleConflict = errors.New(
+		"remote offer conflicts with the configured answering DTLS role",
+	)
+	errPeerConnRemoteDescriptionWithoutMidValue = errors.New(
 		"remoteDescription contained media section without mid value",
 	)
 	errPeerConnRemoteDescriptionDuplicateMid         = errors.New("remoteDescription contained duplicate mid value")
