@@ -567,7 +567,6 @@ func (pc *PeerConnection) SetConfiguration(configuration Configuration) error { 
 		if configuration.PeerIdentity != pc.configuration.PeerIdentity {
 			return &rtcerr.InvalidModificationError{Err: ErrModifyingPeerIdentity}
 		}
-		pc.configuration.PeerIdentity = configuration.PeerIdentity
 	}
 
 	// https://www.w3.org/TR/webrtc/#set-the-configuration (step #3.1 - #3.3)
@@ -1244,6 +1243,10 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error {
 	}
 
 	isRenegotiation := pc.currentRemoteDescription != nil
+
+	if pc.configuration.PeerIdentity != "" {
+		return &rtcerr.NotSupportedError{Err: errIdentityProviderNotImplemented}
+	}
 
 	parsed, unmarshalErr := desc.Unmarshal()
 	if unmarshalErr != nil {
