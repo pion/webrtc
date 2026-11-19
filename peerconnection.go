@@ -2861,11 +2861,14 @@ func (pc *PeerConnection) close(shouldGracefullyClose bool) error { //nolint:cyc
 
 		pc.ops.GracefulClose()
 
+		// GracefulClose waits for the read loop, which removes the closed
+		// channel from the transport, so it must not run under the lock.
 		pc.sctpTransport.lock.Lock()
-		for _, d := range pc.sctpTransport.dataChannels {
+		dataChannels := append([]*DataChannel{}, pc.sctpTransport.dataChannels...)
+		pc.sctpTransport.lock.Unlock()
+		for _, d := range dataChannels {
 			gracefulCloseErrors = append(gracefulCloseErrors, d.GracefulClose())
 		}
-		pc.sctpTransport.lock.Unlock()
 
 		return gracefulCloseErrors
 	}
@@ -3049,6 +3052,8 @@ func (pc *PeerConnection) GetStats() StatsReport {
 	pc.sctpTransport.lock.Lock()
 	dataChannels := append([]*DataChannel{}, pc.sctpTransport.dataChannels...)
 	dataChannelsAccepted = pc.sctpTransport.dataChannelsAccepted
+	dataChannelsClosed = pc.sctpTransport.dataChannelsClosed
+	closedDataChannelStats := slices.Clone(pc.sctpTransport.closedDataChannelStats)
 	dataChannelsOpened = pc.sctpTransport.dataChannelsOpened
 	dataChannelsRequested = pc.sctpTransport.dataChannelsRequested
 	pc.sctpTransport.lock.Unlock()
@@ -3060,6 +3065,10 @@ func (pc *PeerConnection) GetStats() StatsReport {
 		}
 
 		d.collectStats(statsCollector)
+	}
+	for _, stats := range closedDataChannelStats {
+		statsCollector.Collecting()
+		statsCollector.Collect(stats.ID, stats)
 	}
 	pc.sctpTransport.collectStats(statsCollector)
 

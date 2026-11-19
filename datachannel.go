@@ -339,6 +339,9 @@ func (d *DataChannel) handleOpen(dc *datachannel.DataChannel, isRemote, isAlread
 		if err := dc.Close(); err != nil {
 			d.log.Errorf("Failed to close DataChannel that was closed during connecting state %v", err.Error())
 		}
+		// Nothing reads from this channel, so the peer's stream reset will never
+		// be observed. Drop the channel but keep its stream identifier reserved.
+		d.sctpTransport.removeDataChannel(d, false)
 		d.onClose()
 
 		return
@@ -365,11 +368,13 @@ func (d *DataChannel) handleOpen(dc *datachannel.DataChannel, isRemote, isAlread
 	}
 
 	d.mu.Lock()
-	defer d.mu.Unlock()
-
 	if d.isGracefulClosed {
+		d.mu.Unlock()
+		d.sctpTransport.removeDataChannel(d, false)
+
 		return
 	}
+	defer d.mu.Unlock()
 
 	if !d.api.settingEngine.detach.DataChannels {
 		d.readLoopActive = make(chan struct{})
@@ -441,6 +446,9 @@ func (d *DataChannel) readLoop() {
 		if !errors.Is(err, io.EOF) {
 			d.onError(err)
 		}
+		// io.EOF means the stream has been reset by the peer and the SCTP
+		// association has forgotten it, so its identifier can be used again.
+		d.sctpTransport.removeDataChannel(d, errors.Is(err, io.EOF))
 		d.onClose()
 
 		return
@@ -745,9 +753,13 @@ func (d *DataChannel) getStatsID() string {
 
 func (d *DataChannel) collectStats(collector *statsReportCollector) {
 	collector.Collecting()
+	stats := d.stats()
+	collector.Collect(stats.ID, stats)
+}
 
-	d.mu.Lock()
-	defer d.mu.Unlock()
+func (d *DataChannel) stats() DataChannelStats {
+	d.mu.RLock()
+	defer d.mu.RUnlock()
 
 	stats := DataChannelStats{
 		Timestamp: statsTimestampNow(),
@@ -770,7 +782,7 @@ func (d *DataChannel) collectStats(collector *statsReportCollector) {
 		stats.BytesReceived = d.dataChannel.BytesReceived()
 	}
 
-	collector.Collect(stats.ID, stats)
+	return stats
 }
 
 func (d *DataChannel) setReadyState(r DataChannelState) {

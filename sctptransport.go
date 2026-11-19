@@ -10,6 +10,7 @@ import (
 	"errors"
 	"io"
 	"net"
+	"slices"
 	"sync"
 	"time"
 
@@ -67,11 +68,13 @@ type SCTPTransport struct {
 	onDataChannelOpenedHandler func(*DataChannel)
 
 	// DataChannels
-	dataChannels          []*DataChannel
-	dataChannelIDsUsed    map[uint16]struct{}
-	dataChannelsOpened    uint32
-	dataChannelsRequested uint32
-	dataChannelsAccepted  uint32
+	dataChannels           []*DataChannel
+	dataChannelIDsUsed     map[uint16]struct{}
+	dataChannelsOpened     uint32
+	dataChannelsRequested  uint32
+	dataChannelsAccepted   uint32
+	dataChannelsClosed     uint32
+	closedDataChannelStats []DataChannelStats
 
 	localSctpInit []byte
 
@@ -448,6 +451,29 @@ func (r *SCTPTransport) onDataChannel(dc *DataChannel) (done chan struct{}) {
 	}()
 
 	return
+}
+
+// removeDataChannel drops a DataChannel that has been closed so that it, and
+// the SCTP stream it references, can be garbage collected. The stream
+// identifier is released when streamReset is set: the remote peer has reset
+// its side of the stream and the SCTP association no longer tracks it, so a
+// new DataChannel may use the identifier.
+func (r *SCTPTransport) removeDataChannel(dc *DataChannel, streamReset bool) {
+	id := dc.ID()
+	stats := dc.stats()
+	stats.State = DataChannelStateClosed
+
+	r.lock.Lock()
+	defer r.lock.Unlock()
+
+	if i := slices.Index(r.dataChannels, dc); i >= 0 {
+		r.dataChannels = slices.Delete(r.dataChannels, i, i+1)
+		r.closedDataChannelStats = append(r.closedDataChannelStats, stats)
+		r.dataChannelsClosed++
+	}
+	if streamReset && id != nil {
+		delete(r.dataChannelIDsUsed, *id)
+	}
 }
 
 func (r *SCTPTransport) updateMaxChannels() {
