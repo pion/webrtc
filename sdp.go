@@ -78,19 +78,32 @@ func filterTrackWithSSRC(incomingTracks []trackDetails, ssrc SSRC) []trackDetail
 //nolint:cyclop
 func trackDetailsFromSDP(
 	log logging.LeveledLogger,
-	s *sdp.SessionDescription,
+	description *sdp.SessionDescription,
 ) (incomingTracks []trackDetails) {
-	for _, media := range s.MediaDescriptions {
+	for _, media := range description.MediaDescriptions {
 		tracksInMediaSection := []trackDetails{}
 		rtxRepairFlows := map[uint64]uint64{}
 		fecRepairFlows := map[uint64]uint64{}
+
+		// Tracks and repair flows are looked up by SSRC so that the cost of handling
+		// an attribute doesn't grow with the number of attributes seen before it.
+		// A track removed by an ssrc-group is marked with empty ssrcs and dropped after the loop.
+		trackIndexes := map[SSRC]int{}
+		rtxRepairFlowsByBase := map[uint64]uint64{}
+		fecRepairFlowsByBase := map[uint64]uint64{}
+		removeTrackWithSSRC := func(ssrc SSRC) {
+			if i, ok := trackIndexes[ssrc]; ok {
+				tracksInMediaSection[i].ssrcs = nil
+				delete(trackIndexes, ssrc)
+			}
+		}
 
 		// Plan B can have multiple tracks in a single media section
 		streamID := ""
 		trackID := ""
 
 		// If media section is recvonly or inactive skip
-		direction := getPeerDirection(media, s)
+		direction := getPeerDirection(media, description)
 		if direction == RTPTransceiverDirectionRecvonly || direction == RTPTransceiverDirectionInactive {
 			continue
 		}
@@ -128,15 +141,11 @@ func trackDetailsFromSDP(
 							continue
 						}
 						rtxRepairFlows[rtxRepairFlow] = baseSsrc
-						tracksInMediaSection = filterTrackWithSSRC(
-							tracksInMediaSection,
-							SSRC(rtxRepairFlow),
-						) // Remove if rtx was added as track before
-						for i := range tracksInMediaSection {
-							if tracksInMediaSection[i].ssrcs[0] == SSRC(baseSsrc) {
-								repairSsrc := SSRC(rtxRepairFlow)
-								tracksInMediaSection[i].rtxSsrc = &repairSsrc
-							}
+						rtxRepairFlowsByBase[baseSsrc] = rtxRepairFlow
+						removeTrackWithSSRC(SSRC(rtxRepairFlow)) // Remove if rtx was added as track before
+						if i, ok := trackIndexes[SSRC(baseSsrc)]; ok {
+							repairSsrc := SSRC(rtxRepairFlow)
+							tracksInMediaSection[i].rtxSsrc = &repairSsrc
 						}
 					}
 				} else if split[0] == sdp.SemanticTokenForwardErrorCorrectionFramework {
@@ -156,15 +165,11 @@ func trackDetailsFromSDP(
 							continue
 						}
 						fecRepairFlows[fecRepairFlow] = baseSsrc
-						tracksInMediaSection = filterTrackWithSSRC(
-							tracksInMediaSection,
-							SSRC(fecRepairFlow),
-						) // Remove if fec was added as track before
-						for i := range tracksInMediaSection {
-							if tracksInMediaSection[i].ssrcs[0] == SSRC(baseSsrc) {
-								repairSsrc := SSRC(fecRepairFlow)
-								tracksInMediaSection[i].fecSsrc = &repairSsrc
-							}
+						fecRepairFlowsByBase[baseSsrc] = fecRepairFlow
+						removeTrackWithSSRC(SSRC(fecRepairFlow)) // Remove if fec was added as track before
+						if i, ok := trackIndexes[SSRC(baseSsrc)]; ok {
+							repairSsrc := SSRC(fecRepairFlow)
+							tracksInMediaSection[i].fecSsrc = &repairSsrc
 						}
 					}
 				}
@@ -202,13 +207,9 @@ func trackDetailsFromSDP(
 
 				isNewTrack := true
 				trackDetails := &trackDetails{}
-				for i := range tracksInMediaSection {
-					for j := range tracksInMediaSection[i].ssrcs {
-						if tracksInMediaSection[i].ssrcs[j] == SSRC(ssrc) {
-							trackDetails = &tracksInMediaSection[i]
-							isNewTrack = false
-						}
-					}
+				if i, ok := trackIndexes[SSRC(ssrc)]; ok {
+					trackDetails = &tracksInMediaSection[i]
+					isNewTrack = false
 				}
 
 				trackDetails.mid = midValue
@@ -217,24 +218,25 @@ func trackDetailsFromSDP(
 				trackDetails.id = trackID
 				trackDetails.ssrcs = []SSRC{SSRC(ssrc)}
 
-				for r, baseSsrc := range rtxRepairFlows {
-					if baseSsrc == ssrc {
-						repairSsrc := SSRC(r) //nolint:gosec // G115
-						trackDetails.rtxSsrc = &repairSsrc
-					}
+				if r, ok := rtxRepairFlowsByBase[ssrc]; ok {
+					repairSsrc := SSRC(r) //nolint:gosec // G115
+					trackDetails.rtxSsrc = &repairSsrc
 				}
-				for r, baseSsrc := range fecRepairFlows {
-					if baseSsrc == ssrc {
-						fecSsrc := SSRC(r) //nolint:gosec // G115
-						trackDetails.fecSsrc = &fecSsrc
-					}
+				if r, ok := fecRepairFlowsByBase[ssrc]; ok {
+					fecSsrc := SSRC(r) //nolint:gosec // G115
+					trackDetails.fecSsrc = &fecSsrc
 				}
 
 				if isNewTrack {
+					trackIndexes[SSRC(ssrc)] = len(tracksInMediaSection)
 					tracksInMediaSection = append(tracksInMediaSection, *trackDetails)
 				}
 			}
 		}
+
+		tracksInMediaSection = slices.DeleteFunc(tracksInMediaSection, func(t trackDetails) bool {
+			return len(t.ssrcs) == 0
+		})
 
 		if rids := getRids(media); len(rids) != 0 && trackID != "" && streamID != "" {
 			simulcastTrack := trackDetails{
@@ -289,6 +291,7 @@ func trackDetailsToRTPReceiveParameters(trackDetails *trackDetails) RTPReceivePa
 
 func getRids(media *sdp.MediaDescription) []*simulcastRid { // nolint:cyclop
 	rids := []*simulcastRid{}
+	ridsByID := map[string]*simulcastRid{}
 	var simulcastAttr string
 	for _, attr := range media.Attributes {
 		if attr.Key == sdpAttributeRid {
@@ -298,6 +301,9 @@ func getRids(media *sdp.MediaDescription) []*simulcastRid { // nolint:cyclop
 				rid.direction = split[1]
 			}
 			rids = append(rids, rid)
+			if _, ok := ridsByID[rid.id]; !ok {
+				ridsByID[rid.id] = rid
+			}
 		} else if attr.Key == sdpAttributeSimulcast {
 			simulcastAttr = attr.Value
 		}
@@ -310,13 +316,8 @@ func getRids(media *sdp.MediaDescription) []*simulcastRid { // nolint:cyclop
 		ridStates := strings.SplitSeq(simulcastAttr, ";")
 		for ridState := range ridStates {
 			if len(ridState) > 0 && ridState[:1] == "~" {
-				ridID := ridState[1:]
-				for _, rid := range rids {
-					if rid.id == ridID {
-						rid.paused = true
-
-						break
-					}
+				if rid, ok := ridsByID[ridState[1:]]; ok {
+					rid.paused = true
 				}
 			}
 		}
