@@ -7,6 +7,7 @@ package webrtc
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -69,7 +70,7 @@ func (t *RTPTransceiver) SetCodecPreferences(codecs []RTPCodecParameters) error 
 		}
 	}
 
-	t.codecs = filterUnattachedRTX(codecs)
+	t.codecs = filterUnattachedRTX(slices.Clone(codecs))
 
 	return nil
 }

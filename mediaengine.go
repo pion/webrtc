@@ -8,6 +8,7 @@ package webrtc
 import (
 	"errors"
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -719,16 +720,16 @@ func (m *MediaEngine) getCodecsByKind(typ RTPCodecType) []RTPCodecParameters {
 
 	if typ == RTPCodecTypeVideo {
 		if m.negotiatedVideo {
-			return m.negotiatedVideoCodecs
+			return slices.Clone(m.negotiatedVideoCodecs)
 		}
 
-		return m.videoCodecs
+		return slices.Clone(m.videoCodecs)
 	} else if typ == RTPCodecTypeAudio {
 		if m.negotiatedAudio {
-			return m.negotiatedAudioCodecs
+			return slices.Clone(m.negotiatedAudioCodecs)
 		}
 
-		return m.audioCodecs
+		return slices.Clone(m.audioCodecs)
 	}
 
 	return nil
