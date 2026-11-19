@@ -474,17 +474,19 @@ func (r *RTPSender) SetReadDeadline(t time.Time) error {
 // will block before returning. 0 is forever.
 func (r *RTPSender) SetReadDeadlineSimulcast(deadline time.Time, rid string) error {
 	r.mu.RLock()
-	defer r.mu.RUnlock()
-
 	for _, t := range r.trackEncodings {
 		if t.track != nil && t.track.RID() == rid {
-			if t.srtpStream == nil {
+			stream := t.srtpStream
+			r.mu.RUnlock()
+
+			if stream == nil {
 				return errRTPSenderSendNotCalled
 			}
 
-			return t.srtpStream.SetReadDeadline(deadline)
+			return stream.SetReadDeadline(deadline)
 		}
 	}
+	r.mu.RUnlock()
 
 	return fmt.Errorf("%w: %s", errRTPSenderNoTrackForRID, rid)
 }
