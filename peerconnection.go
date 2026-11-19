@@ -1674,6 +1674,13 @@ func (pc *PeerConnection) cryptexModeFromSDP(parsed *sdp.SessionDescription) (sr
 }
 
 func (pc *PeerConnection) configureReceiver(incoming trackDetails, receiver *RTPReceiver) {
+	// A receiver is started for a single trackDetails (see startReceiver), tracks
+	// added by configuring it a second time (e.g. for another a=ssrc in the same
+	// media section) would never get their streams and reading them would panic.
+	if len(receiver.Tracks()) != 0 {
+		return
+	}
+
 	receiver.configureReceive(trackDetailsToRTPReceiveParameters(&incoming))
 
 	// set track id and label early so they can be set as new track information
