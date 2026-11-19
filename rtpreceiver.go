@@ -442,10 +442,7 @@ func (r *RTPReceiver) collectStats(collector *statsReportCollector, statsGetter 
 		collector.Collecting()
 
 		inboundID := fmt.Sprintf("inbound-rtp-%d", uint32(remoteTrack.SSRC()))
-		codecID := ""
-		if remoteTrack.codec.statsID != "" {
-			codecID = remoteTrack.codec.statsID
-		}
+		codecID := remoteTrack.Codec().statsID
 
 		inboundStats := InboundRTPStreamStats{
 			Rid:             remoteTrack.RID(),
