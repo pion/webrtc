@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/pion/interceptor"
+	"github.com/pion/rtcp"
 	"github.com/pion/transport/v5/test"
 	"github.com/pion/webrtc/v4/pkg/media"
 	"github.com/stretchr/testify/assert"
@@ -522,4 +523,59 @@ func Test_RTPSender_SetReadDeadline_Crash(t *testing.T) {
 	assert.Error(t, rtpSender.SetReadDeadline(time.Time{}), errRTPSenderSendNotCalled)
 	assert.NoError(t, stackA.close())
 	assert.NoError(t, stackB.close())
+}
+
+// RTCP addressed to the encoding's RTX SSRC reaches ReadRTCP: a receiver
+// names the SSRC of the last packet it got in its transport-wide feedback
+// (libwebrtc's RemoteEstimatorProxy, pion's twcc.Recorder alike), which
+// after a retransmission or RTX padding is the RTX SSRC.
+func Test_RTPSender_ReadRTCP_RTXSSRC(t *testing.T) {
+	lim := test.TimeOut(time.Second * 30)
+	defer lim.Stop()
+
+	report := test.CheckRoutines(t)
+	defer report()
+
+	sender, receiver, wan := createVNetPair(t, &interceptor.Registry{})
+
+	track, err := NewTrackLocalStaticSample(RTPCodecCapability{MimeType: MimeTypeVP8}, "video", "pion")
+	assert.NoError(t, err)
+
+	rtpSender, err := sender.AddTrack(track)
+	assert.NoError(t, err)
+
+	peerConnectionsConnected := untilConnectionState(PeerConnectionStateConnected, sender, receiver)
+	assert.NoError(t, signalPair(sender, receiver))
+	<-peerConnectionsConnected
+
+	encoding := rtpSender.GetParameters().Encodings[0]
+	assert.NotZero(t, encoding.RTX.SSRC)
+
+	received := make(chan uint32, 2)
+	go func() {
+		for {
+			pkts, _, readErr := rtpSender.ReadRTCP()
+			if readErr != nil {
+				return
+			}
+			for _, pkt := range pkts {
+				if fb, ok := pkt.(*rtcp.PictureLossIndication); ok {
+					received <- fb.MediaSSRC
+				}
+			}
+		}
+	}()
+
+	for _, mediaSSRC := range []uint32{uint32(encoding.RTX.SSRC), uint32(encoding.SSRC)} {
+		assert.NoError(t, receiver.WriteRTCP([]rtcp.Packet{&rtcp.PictureLossIndication{MediaSSRC: mediaSSRC}}))
+		select {
+		case got := <-received:
+			assert.Equal(t, mediaSSRC, got)
+		case <-time.After(5 * time.Second):
+			assert.Fail(t, "no RTCP read", "feedback addressed to ssrc %d", mediaSSRC)
+		}
+	}
+
+	assert.NoError(t, wan.Stop())
+	closePairNow(t, sender, receiver)
 }
