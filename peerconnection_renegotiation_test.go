@@ -974,6 +974,55 @@ func TestPeerConnection_Renegotiation_DisableTrack(t *testing.T) {
 	closePairNow(t, pcOffer, pcAnswer)
 }
 
+func TestPeerConnection_Renegotiation_PayloadTypesCommitWithAnswer(t *testing.T) {
+	lim := test.TimeOut(15 * time.Second)
+	defer lim.Stop()
+
+	pcOffer, pcAnswer, err := newPair()
+	require.NoError(t, err)
+	defer closePairNow(t, pcOffer, pcAnswer)
+
+	localTrack, err := NewTrackLocalStaticRTP(RTPCodecCapability{MimeType: MimeTypeVP8}, "video", "stream")
+	require.NoError(t, err)
+	transceiver, err := pcOffer.AddTransceiverFromTrack(localTrack)
+	require.NoError(t, err)
+	connected := untilConnectionState(PeerConnectionStateConnected, pcOffer, pcAnswer)
+	require.NoError(t, signalPair(pcOffer, pcAnswer))
+	<-connected
+
+	const vp8PayloadType, vp9PayloadType = 96, 98
+	receiver := pcAnswer.GetReceivers()[0]
+	require.True(t, receiver.remotePayloadTypes().accepts(vp8PayloadType))
+	vp9 := findCodecByPayload(transceiver.getCodecs(), vp9PayloadType)
+	require.NotNil(t, vp9)
+	require.NoError(t, transceiver.SetCodecPreferences([]RTPCodecParameters{*vp9}))
+
+	offer, err := pcOffer.CreateOffer(nil)
+	require.NoError(t, err)
+	require.NoError(t, pcOffer.SetLocalDescription(offer))
+	require.NoError(t, pcAnswer.SetRemoteDescription(offer))
+	assert.True(t, receiver.remotePayloadTypes().accepts(vp8PayloadType))
+
+	// The first read should still use the existing codecs while the new offer is pending.
+	remoteTrack := receiver.Track()
+	require.NotNil(t, remoteTrack)
+	require.NoError(t, remoteTrack.SetReadDeadline(time.Now().Add(time.Second)))
+	require.NoError(t, localTrack.WriteRTP(&rtp.Packet{
+		Header:  rtp.Header{Version: 2},
+		Payload: []byte{0x00, 0x01},
+	}))
+	packet, _, err := remoteTrack.ReadRTP()
+	require.NoError(t, err)
+	assert.Equal(t, uint8(vp8PayloadType), packet.PayloadType)
+
+	answer, err := pcAnswer.CreateAnswer(nil)
+	require.NoError(t, err)
+	require.NoError(t, pcAnswer.SetLocalDescription(answer))
+	assert.False(t, receiver.remotePayloadTypes().accepts(vp8PayloadType))
+	assert.True(t, receiver.remotePayloadTypes().accepts(vp9PayloadType))
+	require.NoError(t, pcOffer.SetRemoteDescription(answer))
+}
+
 func TestPeerConnection_Renegotiation_Simulcast(t *testing.T) {
 	lim := test.TimeOut(time.Second * 30)
 	defer lim.Stop()

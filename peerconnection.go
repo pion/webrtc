@@ -1271,6 +1271,7 @@ func (pc *PeerConnection) SetLocalDescription(desc SessionDescription) error {
 	weAnswer := desc.Type == SDPTypeAnswer
 	remoteDesc := pc.RemoteDescription()
 	if weAnswer && remoteDesc != nil {
+		pc.setRemotePayloadTypes(currentTransceivers)
 		_ = setRTPTransceiverCurrentDirection(&desc, currentTransceivers, false)
 		if err := pc.startRTPSenders(currentTransceivers); err != nil {
 			return err
@@ -1561,6 +1562,7 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error {
 	}
 
 	currentTransceivers := append([]*RTPTransceiver{}, pc.GetTransceivers()...)
+	pc.setRemotePayloadTypes(currentTransceivers)
 
 	if isRenegotiation { //nolint:nestif
 		if weOffer {
@@ -1629,6 +1631,29 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error {
 	})
 
 	return nil
+}
+
+// setRemotePayloadTypes uses the current description for negotiated MIDs and the
+// pending description for MIDs that are being negotiated for the first time.
+func (pc *PeerConnection) setRemotePayloadTypes(transceivers []*RTPTransceiver) {
+	pc.mu.RLock()
+	defer pc.mu.RUnlock()
+
+	mediaByMID := make(map[string]*sdp.MediaDescription)
+	for _, desc := range []*SessionDescription{pc.pendingRemoteDescription, pc.currentRemoteDescription} {
+		if desc == nil || desc.parsed == nil {
+			continue
+		}
+		for _, media := range desc.parsed.MediaDescriptions {
+			if mid := getMidValue(media); mid != "" {
+				mediaByMID[mid] = media
+			}
+		}
+	}
+
+	for _, transceiver := range transceivers {
+		transceiver.setRemotePayloadTypes(mediaByMID[transceiver.Mid()], pc.pendingRemoteDescription != nil)
+	}
 }
 
 // bundleGroupMids returns the full list of mids in a=group:BUNDLE, in order. The first entry is the
@@ -2362,22 +2387,37 @@ func (pc *PeerConnection) handleIncomingSSRC(rtpStream *srtp.ReadStreamSRTP, ssr
 		}
 	}
 
-	if mid != "" && (rid != "" || rsid != "") {
-		for _, t := range pc.GetTransceivers() {
-			receiver := t.Receiver()
-			if t.Mid() != mid || receiver == nil {
-				continue
-			}
+	if mid == "" || (rid == "" && rsid == "") {
+		return errPeerConnSimulcastIncomingSSRCFailed
+	}
 
-			if rsid != "" {
-				err = receiver.receiveForRtx(SSRC(0), rsid, streamInfo, result)
-			} else {
-				_, err = receiver.receiveForRid(rid, params, streamInfo, result, peekedPackets)
-			}
-			handedToReceiver = err == nil || receiver.ownsStream(streamInfo)
-
-			return err
+	for _, t := range pc.GetTransceivers() {
+		receiver := t.Receiver()
+		if t.Mid() != mid || receiver == nil {
+			continue
 		}
+
+		receivedPayloadType := PayloadType(b[1] & rtpPayloadTypeBitmask)
+		payloads := receiver.remotePayloadTypes()
+		if !payloads.accepts(receivedPayloadType) {
+			return ErrCodecNotFound
+		}
+
+		// Repair RIDs can bind RTX omitted from the receiver's codec preferences.
+		if rsid != "" {
+			err = receiver.receiveForRtx(SSRC(0), rsid, streamInfo, result)
+		} else {
+			receiverParameters := receiver.getParameters(payloads)
+			codec := findCodecByPayload(receiverParameters.Codecs, receivedPayloadType)
+			if codec == nil {
+				return ErrCodecNotFound
+			}
+			receiverParameters.Codecs = []RTPCodecParameters{*codec}
+			_, err = receiver.receiveForRid(rid, receiverParameters, streamInfo, result, peekedPackets)
+		}
+		handedToReceiver = err == nil || receiver.ownsStream(streamInfo)
+
+		return err
 	}
 
 	return errPeerConnSimulcastIncomingSSRCFailed

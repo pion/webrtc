@@ -1361,8 +1361,9 @@ func TestPeerConnection_Simulcast_Probe(t *testing.T) {
 						sentOnePacket = true
 
 						header := &rtp.Header{
-							Version: 2,
-							SSRC:    util.RandUint32(),
+							Version:     2,
+							PayloadType: uint8(senderTrack.bindings[0].payloadType),
+							SSRC:        util.RandUint32(),
 						}
 						header.Extension = true
 						header.ExtensionProfile = 0x1000

@@ -51,7 +51,7 @@ type RTPReceiver struct {
 	received   chan any
 	mu         sync.RWMutex
 
-	tr *RTPTransceiver
+	tr atomic.Pointer[RTPTransceiver]
 
 	// A reference to the associated api object
 	api *API
@@ -79,9 +79,7 @@ func (api *API) NewRTPReceiver(kind RTPCodecType, transport *DTLSTransport) (*RT
 }
 
 func (r *RTPReceiver) setRTPTransceiver(tr *RTPTransceiver) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	r.tr = tr
+	r.tr.Store(tr)
 }
 
 // Transport returns the currently-configured *DTLSTransport or nil
@@ -93,13 +91,15 @@ func (r *RTPReceiver) Transport() *DTLSTransport {
 	return r.transport
 }
 
-func (r *RTPReceiver) getParameters() RTPParameters {
+func (r *RTPReceiver) getParameters(payloads *remoteRTPPayloadTypes) RTPParameters {
 	parameters := r.api.mediaEngine.getRTPParametersByKind(
 		r.kind,
 		[]RTPTransceiverDirection{RTPTransceiverDirectionRecvonly},
 	)
-	if r.tr != nil {
-		parameters.Codecs = r.tr.getCodecs()
+	if payloads != nil {
+		parameters.Codecs = payloads.codecs
+	} else if tr := r.tr.Load(); tr != nil {
+		parameters.Codecs = tr.getCodecs()
 	}
 
 	return parameters
@@ -111,7 +111,7 @@ func (r *RTPReceiver) GetParameters() RTPParameters {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
-	return r.getParameters()
+	return r.getParameters(nil)
 }
 
 // Track returns the RtpTransceiver TrackRemote.
@@ -143,10 +143,15 @@ func (r *RTPReceiver) Tracks() []*TrackRemote {
 // RTPTransceiver returns the RTPTransceiver this
 // RTPReceiver belongs too, or nil if none.
 func (r *RTPReceiver) RTPTransceiver() *RTPTransceiver {
-	r.mu.Lock()
-	defer r.mu.Unlock()
+	return r.tr.Load()
+}
 
-	return r.tr
+func (r *RTPReceiver) remotePayloadTypes() *remoteRTPPayloadTypes {
+	if tr := r.tr.Load(); tr != nil {
+		return tr.remotePayloadTypes.Load()
+	}
+
+	return nil
 }
 
 // configureReceive initialize the track.
@@ -183,7 +188,7 @@ func (r *RTPReceiver) startReceive(parameters RTPReceiveParameters) error { //no
 		return io.EOF
 	}
 
-	globalParams := r.getParameters()
+	globalParams := r.getParameters(nil)
 	codec := RTPCodecCapability{}
 	if len(globalParams.Codecs) != 0 {
 		codec = globalParams.Codecs[0].RTPCodecCapability
@@ -446,8 +451,8 @@ func (r *RTPReceiver) collectStats(collector *statsReportCollector, statsGetter 
 
 	// Emit inbound-rtp stats for each track
 	mid := ""
-	if r.tr != nil {
-		mid = r.tr.Mid()
+	if tr := r.tr.Load(); tr != nil {
+		mid = tr.Mid()
 	}
 	now := statsTimestampNow()
 	nowTime := now.Time()

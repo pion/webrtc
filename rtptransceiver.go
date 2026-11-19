@@ -8,6 +8,7 @@ package webrtc
 import (
 	"fmt"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -17,6 +18,16 @@ import (
 	"github.com/pion/webrtc/v5/internal/fmtp"
 )
 
+type remoteRTPPayloadTypes struct {
+	media   *sdp.MediaDescription
+	formats [256]bool
+	codecs  []RTPCodecParameters
+}
+
+func (p *remoteRTPPayloadTypes) accepts(payloadType PayloadType) bool {
+	return p == nil || p.formats[payloadType]
+}
+
 // RTPTransceiver represents a combination of an RTPSender and an RTPReceiver that share a common mid.
 type RTPTransceiver struct {
 	mid                    atomic.Value // string
@@ -25,6 +36,7 @@ type RTPTransceiver struct {
 	direction              atomic.Value // RTPTransceiverDirection
 	currentDirection       atomic.Value // RTPTransceiverDirection
 	currentRemoteDirection atomic.Value // RTPTransceiverDirection
+	remotePayloadTypes     atomic.Pointer[remoteRTPPayloadTypes]
 
 	codecs                     []RTPCodecParameters
 	codecPreferencesFromRemote bool
@@ -55,6 +67,28 @@ func newRTPTransceiver(
 	t.setCurrentDirection(RTPTransceiverDirectionUnknown)
 
 	return t
+}
+
+func (t *RTPTransceiver) setRemotePayloadTypes(media *sdp.MediaDescription, offerPending bool) {
+	if media == nil {
+		return
+	}
+
+	// The pending offer may already have refreshed the transceiver's codec preferences.
+	if current := t.remotePayloadTypes.Load(); offerPending && current != nil && current.media == media {
+		return
+	}
+
+	payloads := &remoteRTPPayloadTypes{media: media}
+	if t.Kind() == NewRTPCodecType(media.MediaName.Media) {
+		for _, format := range media.MediaName.Formats {
+			if payloadType, err := strconv.ParseUint(format, 10, 8); err == nil {
+				payloads.formats[payloadType] = true
+			}
+		}
+		payloads.codecs = t.getCodecs()
+	}
+	t.remotePayloadTypes.Store(payloads)
 }
 
 // SetCodecPreferences sets preferred list of supported codecs
