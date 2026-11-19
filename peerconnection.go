@@ -3415,6 +3415,11 @@ func (pc *PeerConnection) generateMatchedSDP(
 			continue
 		}
 
+		var remoteOffer *sdp.MediaDescription
+		if !includeUnmatched {
+			remoteOffer = media
+		}
+
 		sdpSemantics := pc.configuration.SDPSemantics
 
 		switch {
@@ -3446,6 +3451,7 @@ func (pc *PeerConnection) generateMatchedSDP(
 			}
 			mediaSections = append(mediaSections, mediaSection{
 				id:           midValue,
+				remoteOffer:  remoteOffer,
 				transceivers: mediaTransceivers,
 				cryptex:      cryptexAtMediaLevel,
 			})
@@ -3472,6 +3478,7 @@ func (pc *PeerConnection) generateMatchedSDP(
 				mediaSections,
 				mediaSection{
 					id:              midValue,
+					remoteOffer:     remoteOffer,
 					transceivers:    mediaTransceivers,
 					matchExtensions: extensions,
 					rids:            getRids(media),
