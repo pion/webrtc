@@ -14,6 +14,7 @@ import (
 	"crypto/x509"
 	"errors"
 	"fmt"
+	"io"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -83,6 +84,13 @@ type srtpRTPReader struct {
 
 func (r *srtpRTPReader) Read(in []byte, a interceptor.Attributes) (int, interceptor.Attributes, error) {
 	n, err := r.readStream.Read(in)
+	if errors.Is(err, io.EOF) {
+		// OpenReadStream returns the existing stream of a SSRC, so a stream may have more than one
+		// reader: a remote description that names one RTX SSRC in several media sections, or a
+		// simulcast probe still blocked on a SSRC that was declared afterwards. Closing the stream
+		// only wakes up one of them, the deadline releases the others.
+		_ = r.readStream.SetReadDeadline(time.Now())
+	}
 
 	return n, a, err
 }
