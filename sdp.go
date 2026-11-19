@@ -187,11 +187,16 @@ func trackDetailsFromSDP(
 				}
 			}
 		}
-		if len(track.rids) != 0 {
+		switch {
+		case len(track.rids) != 0:
 			track.ssrcs = nil
-		} else if len(track.ssrcs) != 0 {
+		case len(track.ssrcs) != 0:
+			ssrcPositions := make(map[SSRC]int, len(track.ssrcs))
+			for pos, ssrc := range slices.Backward(track.ssrcs) {
+				ssrcPositions[ssrc] = pos
+			}
 			for repair, base := range rtxRepairFlows {
-				if pos := slices.Index(track.ssrcs, base); pos != -1 {
+				if pos, ok := ssrcPositions[base]; ok {
 					if track.rtxSsrc == nil {
 						track.rtxSsrc = make([]*SSRC, len(track.ssrcs))
 					}
@@ -199,14 +204,14 @@ func trackDetailsFromSDP(
 				}
 			}
 			for repair, base := range fecRepairFlows {
-				if pos := slices.Index(track.ssrcs, base); pos != -1 {
+				if pos, ok := ssrcPositions[base]; ok {
 					if track.fecSsrc == nil {
 						track.fecSsrc = make([]*SSRC, len(track.ssrcs))
 					}
 					track.fecSsrc[pos] = &repair
 				}
 			}
-		} else {
+		default:
 			continue
 		}
 
@@ -242,6 +247,7 @@ func trackDetailsToRTPReceiveParameters(trackDetails *trackDetails) RTPReceivePa
 
 func getRids(media *sdp.MediaDescription) []*simulcastRid { //nolint:cyclop
 	rids := []*simulcastRid{}
+	ridsByID := map[string]*simulcastRid{}
 	var simulcastAttr string
 	for _, attr := range media.Attributes {
 		if attr.Key == sdpAttributeRid {
@@ -251,6 +257,9 @@ func getRids(media *sdp.MediaDescription) []*simulcastRid { //nolint:cyclop
 				rid.direction = split[1]
 			}
 			rids = append(rids, rid)
+			if _, ok := ridsByID[rid.id]; !ok {
+				ridsByID[rid.id] = rid
+			}
 		} else if attr.Key == sdpAttributeSimulcast {
 			simulcastAttr = attr.Value
 		}
@@ -266,14 +275,8 @@ func getRids(media *sdp.MediaDescription) []*simulcastRid { //nolint:cyclop
 	simulcastOrder := map[string]int{}
 	for _, scID := range strings.FieldsFunc(simulcastAttr, func(r rune) bool { return r == ';' || r == ',' }) {
 		ridID, paused := strings.CutPrefix(scID, "~")
-		if paused {
-			for _, rid := range rids {
-				if rid.id == ridID {
-					rid.paused = true
-
-					break
-				}
-			}
+		if rid := ridsByID[ridID]; paused && rid != nil {
+			rid.paused = true
 		}
 		if _, ok := simulcastOrder[ridID]; !ok {
 			simulcastOrder[ridID] = len(simulcastOrder)
