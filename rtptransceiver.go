@@ -8,6 +8,7 @@ package webrtc
 import (
 	"fmt"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -25,6 +26,7 @@ type RTPTransceiver struct {
 	direction              atomic.Value // RTPTransceiverDirection
 	currentDirection       atomic.Value // RTPTransceiverDirection
 	currentRemoteDirection atomic.Value // RTPTransceiverDirection
+	remotePayloadTypes     atomic.Pointer[[256]bool]
 
 	codecs []RTPCodecParameters // User provided codecs via SetCodecPreferences
 
@@ -54,6 +56,22 @@ func newRTPTransceiver(
 	t.setCurrentDirection(RTPTransceiverDirectionUnknown)
 
 	return t
+}
+
+func (t *RTPTransceiver) setRemotePayloadTypes(media *sdp.MediaDescription) {
+	if media == nil {
+		return
+	}
+
+	formats := &[256]bool{}
+	if t.Kind() == NewRTPCodecType(media.MediaName.Media) {
+		for _, format := range media.MediaName.Formats {
+			if payloadType, err := strconv.ParseUint(format, 10, 8); err == nil {
+				formats[payloadType] = true
+			}
+		}
+	}
+	t.remotePayloadTypes.Store(formats)
 }
 
 // SetCodecPreferences sets preferred list of supported codecs

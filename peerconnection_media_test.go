@@ -1428,8 +1428,9 @@ func TestPeerConnection_Simulcast_Probe(t *testing.T) {
 						sentOnePacket = true
 
 						header := &rtp.Header{
-							Version: 2,
-							SSRC:    util.RandUint32(),
+							Version:     2,
+							PayloadType: uint8(senderTrack.bindings[0].payloadType),
+							SSRC:        util.RandUint32(),
 						}
 						header.Extension = true
 						header.ExtensionProfile = 0x1000
@@ -1447,7 +1448,7 @@ func TestPeerConnection_Simulcast_Probe(t *testing.T) {
 
 		<-seenOneStream.Done()
 
-		assert.Equal(t, true, onTrackCalled.Load())
+		assert.Eventually(t, onTrackCalled.Load, time.Second, 10*time.Millisecond)
 
 		closePairNow(t, offerer, answerer)
 		close(testFinished)

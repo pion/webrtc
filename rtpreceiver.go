@@ -70,7 +70,7 @@ type RTPReceiver struct {
 	closedChan, received chan any
 	mu                   sync.RWMutex
 
-	tr *RTPTransceiver
+	tr atomic.Pointer[RTPTransceiver]
 
 	// A reference to the associated api object
 	api *API
@@ -103,9 +103,7 @@ func (api *API) NewRTPReceiver(kind RTPCodecType, transport *DTLSTransport) (*RT
 }
 
 func (r *RTPReceiver) setRTPTransceiver(tr *RTPTransceiver) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	r.tr = tr
+	r.tr.Store(tr)
 }
 
 // Transport returns the currently-configured *DTLSTransport or nil
@@ -122,8 +120,8 @@ func (r *RTPReceiver) getParameters() RTPParameters {
 		r.kind,
 		[]RTPTransceiverDirection{RTPTransceiverDirectionRecvonly},
 	)
-	if r.tr != nil {
-		parameters.Codecs = r.tr.getCodecs()
+	if tr := r.tr.Load(); tr != nil {
+		parameters.Codecs = tr.getCodecs()
 	}
 
 	return parameters
@@ -167,10 +165,17 @@ func (r *RTPReceiver) Tracks() []*TrackRemote {
 // RTPTransceiver returns the RTPTransceiver this
 // RTPReceiver belongs too, or nil if none.
 func (r *RTPReceiver) RTPTransceiver() *RTPTransceiver {
-	r.mu.Lock()
-	defer r.mu.Unlock()
+	return r.tr.Load()
+}
 
-	return r.tr
+func (r *RTPReceiver) acceptsPayloadType(payloadType PayloadType) bool {
+	if tr := r.tr.Load(); tr != nil {
+		if formats := tr.remotePayloadTypes.Load(); formats != nil {
+			return formats[payloadType]
+		}
+	}
+
+	return true
 }
 
 // configureReceive initialize the track.
@@ -450,8 +455,8 @@ func (r *RTPReceiver) collectStats(collector *statsReportCollector, statsGetter 
 
 	// Emit inbound-rtp stats for each track
 	mid := ""
-	if r.tr != nil {
-		mid = r.tr.Mid()
+	if tr := r.tr.Load(); tr != nil {
+		mid = tr.Mid()
 	}
 	now := statsTimestampNow()
 	nowTime := now.Time()

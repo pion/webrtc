@@ -1185,6 +1185,7 @@ func (pc *PeerConnection) SetLocalDescription(desc SessionDescription) error {
 	weAnswer := desc.Type == SDPTypeAnswer
 	remoteDesc := pc.RemoteDescription()
 	if weAnswer && remoteDesc != nil {
+		pc.setRemotePayloadTypes(currentTransceivers)
 		_ = setRTPTransceiverCurrentDirection(&desc, currentTransceivers, false)
 		if err := pc.startRTPSenders(currentTransceivers); err != nil {
 			return err
@@ -1421,6 +1422,7 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error {
 	}
 
 	currentTransceivers := append([]*RTPTransceiver{}, pc.GetTransceivers()...)
+	pc.setRemotePayloadTypes(currentTransceivers)
 
 	if isRenegotiation {
 		if weOffer {
@@ -1491,6 +1493,29 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error {
 	})
 
 	return nil
+}
+
+// setRemotePayloadTypes uses the current description for negotiated MIDs and the
+// pending description for MIDs that are being negotiated for the first time.
+func (pc *PeerConnection) setRemotePayloadTypes(transceivers []*RTPTransceiver) {
+	pc.mu.RLock()
+	defer pc.mu.RUnlock()
+
+	mediaByMID := make(map[string]*sdp.MediaDescription)
+	for _, desc := range []*SessionDescription{pc.pendingRemoteDescription, pc.currentRemoteDescription} {
+		if desc == nil || desc.parsed == nil {
+			continue
+		}
+		for _, media := range desc.parsed.MediaDescriptions {
+			if mid := getMidValue(media); mid != "" {
+				mediaByMID[mid] = media
+			}
+		}
+	}
+
+	for _, transceiver := range transceivers {
+		transceiver.setRemotePayloadTypes(mediaByMID[transceiver.Mid()])
+	}
 }
 
 // bundleGroupMids returns the full list of mids in a=group:BUNDLE, in order. The first entry is the
@@ -2260,6 +2285,17 @@ func (pc *PeerConnection) handleIncomingSSRC(rtpStream *srtp.ReadStreamSRTP, ssr
 				continue
 			}
 
+			receivedPayloadType := PayloadType(b[1] & rtpPayloadTypeBitmask)
+			if !receiver.acceptsPayloadType(receivedPayloadType) {
+				return ErrCodecNotFound
+			}
+			receiverParameters := receiver.GetParameters()
+			codec := findCodecByPayload(receiverParameters.Codecs, receivedPayloadType)
+			if codec == nil {
+				return ErrCodecNotFound
+			}
+			receiverParameters.Codecs = []RTPCodecParameters{*codec}
+
 			if rsid != "" {
 				if err = receiver.receiveForRtx(
 					SSRC(0),
@@ -2280,7 +2316,7 @@ func (pc *PeerConnection) handleIncomingSSRC(rtpStream *srtp.ReadStreamSRTP, ssr
 
 			track, err := receiver.receiveForRid(
 				rid,
-				params,
+				receiverParameters,
 				streamInfo,
 				readStream,
 				interceptor,
