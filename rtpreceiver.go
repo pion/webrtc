@@ -215,7 +215,7 @@ func (r *RTPReceiver) startReceive(parameters RTPReceiveParameters) error { //no
 			globalParams.HeaderExtensions,
 		)
 
-		result, err := r.transport.streamsForSSRC(parameters.Encodings[i].SSRC, *streams.streamInfo)
+		result, err := r.transport.streamsForSSRC(parameters.Encodings[i].SSRC, streams.streamInfo)
 		if err != nil {
 			return err
 		}
@@ -231,10 +231,7 @@ func (r *RTPReceiver) startReceive(parameters RTPReceiveParameters) error { //no
 			rtxCodec.RTCPFeedback = nil
 			rtxCodec.MimeType = MimeTypeRTX
 			streamInfo := createStreamInfo("", rtxSsrc, 0, 0, 0, 0, 0, rtxCodec, globalParams.HeaderExtensions)
-			result, err = r.transport.streamsForSSRC(
-				rtxSsrc,
-				*streamInfo,
-			)
+			result, err = r.transport.streamsForSSRC(rtxSsrc, streamInfo)
 			if err != nil {
 				return err
 			}
@@ -713,6 +710,19 @@ func (t *trackStreams) setRTX() error {
 	t.rtpReader.repair.Store(t.repairReader)
 
 	return t.rtpReader.readStream.SetRTX(t.repairReader.readStream.GetSSRC())
+}
+
+func (r *RTPReceiver) ownsStream(info *interceptor.StreamInfo) bool {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	for _, track := range r.tracks {
+		if track.streamInfo == info || track.repairStreamInfo == info {
+			return true
+		}
+	}
+
+	return false
 }
 
 // SetReadDeadline sets the max amount of time the RTCP stream will block before returning. 0 is forever.

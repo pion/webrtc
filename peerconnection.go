@@ -2306,10 +2306,18 @@ func (pc *PeerConnection) handleIncomingSSRC(rtpStream *srtp.ReadStreamSRTP, ssr
 		params.Codecs[0].RTPCodecCapability,
 		params.HeaderExtensions,
 	)
-	result, err := pc.dtlsTransport.streamsForSSRC(ssrc, *streamInfo)
+	result, err := pc.dtlsTransport.streamsForSSRC(ssrc, streamInfo)
 	if err != nil {
 		return err
 	}
+
+	// Until a RTPReceiver takes ownership of the stream nothing else will unbind it
+	handedToReceiver := false
+	defer func() {
+		if !handedToReceiver {
+			pc.api.interceptor.UnbindRemoteStream(streamInfo)
+		}
+	}()
 
 	// try to read simulcast IDs from the packet we already have
 	mid, rid, rsid, _, err := handleUnknownRTPPacket(
@@ -2325,9 +2333,9 @@ func (pc *PeerConnection) handleIncomingSSRC(rtpStream *srtp.ReadStreamSRTP, ssr
 
 	// if the first packet didn't contain simuilcast IDs, then probe more packets
 	for readCount := 0; (mid == "" || (rid == "" && rsid == "")) && readCount < simulcastProbeCount; {
-		i, attributes, err := result.rtpInterceptor.Read(b, nil)
-		if err != nil {
-			return err
+		i, attributes, readErr := result.rtpInterceptor.Read(b, nil)
+		if readErr != nil {
+			return readErr
 		}
 
 		peekedPackets = append(peekedPackets, &peekedPacket{
@@ -2357,16 +2365,15 @@ func (pc *PeerConnection) handleIncomingSSRC(rtpStream *srtp.ReadStreamSRTP, ssr
 			}
 
 			if rsid != "" {
-				return receiver.receiveForRtx(SSRC(0), rsid, streamInfo, result)
+				err = receiver.receiveForRtx(SSRC(0), rsid, streamInfo, result)
+			} else {
+				_, err = receiver.receiveForRid(rid, params, streamInfo, result, peekedPackets)
 			}
-
-			_, err := receiver.receiveForRid(rid, params, streamInfo, result, peekedPackets)
+			handedToReceiver = err == nil || receiver.ownsStream(streamInfo)
 
 			return err
 		}
 	}
-
-	pc.api.interceptor.UnbindRemoteStream(streamInfo)
 
 	return errPeerConnSimulcastIncomingSSRCFailed
 }
