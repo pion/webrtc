@@ -2887,7 +2887,9 @@ func (pc *PeerConnection) close(shouldGracefullyClose bool) error { //nolint:cyc
 
 	closeErrs = append(closeErrs, doGracefulCloseOps()...)
 
+	pc.mu.Lock()
 	pc.statsGetter = nil
+	pc.mu.Unlock()
 	cleanupStats(pc.id)
 
 	// Interceptor closes at the end to prevent Bind from being called after interceptor is closed
@@ -3053,11 +3055,12 @@ func (pc *PeerConnection) GetStats() StatsReport {
 			continue
 		}
 	}
+	statsGetter := pc.statsGetter
 	pc.mu.Unlock()
 
 	receivers := pc.GetReceivers()
 	for _, receiver := range receivers {
-		receiver.collectStats(statsCollector, pc.statsGetter)
+		receiver.collectStats(statsCollector, statsGetter)
 	}
 
 	pc.api.mediaEngine.collectStats(statsCollector)
