@@ -861,14 +861,32 @@ func (t *DTLSTransport) ensureICEConn() error {
 	return nil
 }
 
+// storeSimulcastStream keeps the streams so that Stop can close them.
+// It returns false if the transport has already stopped.
 func (t *DTLSTransport) storeSimulcastStream(
 	srtpReadStream *srtp.ReadStreamSRTP,
 	srtcpReadStream *srtp.ReadStreamSRTCP,
-) {
+) bool {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
+	if t.state == DTLSTransportStateClosed {
+		return false
+	}
+
 	t.simulcastStreams = append(t.simulcastStreams, simulcastStreamPair{srtpReadStream, srtcpReadStream})
+
+	return true
+}
+
+// removeSimulcastStream forgets the streams after the RTPReceiver that used them has closed them.
+func (t *DTLSTransport) removeSimulcastStream(srtpReadStream *srtp.ReadStreamSRTP) {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+
+	t.simulcastStreams = slices.DeleteFunc(t.simulcastStreams, func(pair simulcastStreamPair) bool {
+		return pair.srtp == srtpReadStream
+	})
 }
 
 func (t *DTLSTransport) streamsForSSRC(

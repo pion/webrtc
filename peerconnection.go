@@ -2409,7 +2409,7 @@ func (pc *PeerConnection) undeclaredRTPMediaProcessor() { //nolint:cyclop
 			return
 		}
 
-		if pc.isClosed.Load() {
+		if pc.isClosed.Load() || !pc.dtlsTransport.storeSimulcastStream(srtpReadStream, srtcpReadStream) {
 			if err = srtpReadStream.Close(); err != nil {
 				pc.log.Warnf("Failed to close RTP stream %v", err)
 			}
@@ -2419,8 +2419,6 @@ func (pc *PeerConnection) undeclaredRTPMediaProcessor() { //nolint:cyclop
 
 			continue
 		}
-
-		pc.dtlsTransport.storeSimulcastStream(srtpReadStream, srtcpReadStream)
 
 		if ssrc == 0 {
 			go pc.handleNonMediaBandwidthProbe()
