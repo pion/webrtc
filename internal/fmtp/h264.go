@@ -8,6 +8,10 @@ import (
 )
 
 func profileLevelIDMatches(a, b string) bool {
+	if len(a) > 6 || len(b) > 6 {
+		return false
+	}
+
 	aa, err := hex.DecodeString(a)
 	if err != nil || len(aa) < 2 {
 		return false
@@ -21,6 +25,7 @@ func profileLevelIDMatches(a, b string) bool {
 }
 
 type h264FMTP struct {
+	clockRate  uint32
 	parameters map[string]string
 }
 
@@ -44,6 +49,10 @@ func (h *h264FMTP) MimeType() string {
 func (h *h264FMTP) Match(b FMTP) bool {
 	fmtp, ok := b.(*h264FMTP)
 	if !ok {
+		return false
+	}
+
+	if !ClockRateEqual(h.MimeType(), h.clockRate, fmtp.clockRate) {
 		return false
 	}
 

@@ -8,6 +8,7 @@ package webrtc
 import (
 	"errors"
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -36,6 +37,10 @@ type MediaEngine struct {
 
 	videoCodecs, audioCodecs                     []RTPCodecParameters
 	negotiatedVideoCodecs, negotiatedAudioCodecs []RTPCodecParameters
+	// Parsed SDPFmtpLine of the negotiated codec at the same index. The lines come
+	// from the remote description and are not bounded in length, so they are parsed
+	// once when the codec is stored instead of on every codec search.
+	negotiatedVideoFMTPs, negotiatedAudioFMTPs []fmtp.FMTP
 
 	headerExtensions           []mediaEngineHeaderExtension
 	negotiatedHeaderExtensions map[int]mediaEngineHeaderExtension
@@ -566,23 +571,47 @@ func (m *MediaEngine) updateHeaderExtension(id int, extension string, typ RTPCod
 
 	for _, localExtension := range m.headerExtensions {
 		if localExtension.uri == extension {
-			h := mediaEngineHeaderExtension{uri: extension, allowedDirections: localExtension.allowedDirections}
+			headerExtension := mediaEngineHeaderExtension{uri: extension, allowedDirections: localExtension.allowedDirections}
 			if existingValue, ok := m.negotiatedHeaderExtensions[id]; ok {
-				h = existingValue
+				headerExtension = existingValue
 			}
 
 			switch {
 			case localExtension.isAudio && typ == RTPCodecTypeAudio:
-				h.isAudio = true
+				headerExtension.isAudio = true
 			case localExtension.isVideo && typ == RTPCodecTypeVideo:
-				h.isVideo = true
+				headerExtension.isVideo = true
 			}
 
-			m.negotiatedHeaderExtensions[id] = h
+			m.negotiatedHeaderExtensions[id] = headerExtension
+			m.releaseOtherHeaderExtensionIDs(id, headerExtension.uri, typ)
 		}
 	}
 
 	return nil
+}
+
+// A header extension is negotiated under one ID per kind. The IDs are picked by the remote, so when
+// it moves an extension to another ID the previous one is released instead of staying negotiated
+// forever and being listed next to the new one.
+func (m *MediaEngine) releaseOtherHeaderExtensionIDs(id int, uri string, typ RTPCodecType) {
+	for otherID, other := range m.negotiatedHeaderExtensions {
+		if otherID == id || other.uri != uri {
+			continue
+		}
+
+		if typ == RTPCodecTypeAudio {
+			other.isAudio = false
+		} else if typ == RTPCodecTypeVideo {
+			other.isVideo = false
+		}
+
+		if other.isAudio || other.isVideo {
+			m.negotiatedHeaderExtensions[otherID] = other
+		} else {
+			delete(m.negotiatedHeaderExtensions, otherID)
+		}
+	}
 }
 
 func (m *MediaEngine) pushCodecs(codecs []RTPCodecParameters, typ RTPCodecType) error {
@@ -597,6 +626,18 @@ func (m *MediaEngine) pushCodecs(codecs []RTPCodecParameters, typ RTPCodecType) 
 		if err != nil {
 			joinedErr = errors.Join(joinedErr, err)
 		}
+	}
+
+	// addCodec only ever appends, so the codecs added above are the tail of the list
+	// that has no parsed fmtp yet.
+	if typ == RTPCodecTypeAudio {
+		m.negotiatedAudioFMTPs = append(
+			m.negotiatedAudioFMTPs, parseCodecFMTPs(m.negotiatedAudioCodecs[len(m.negotiatedAudioFMTPs):])...,
+		)
+	} else if typ == RTPCodecTypeVideo {
+		m.negotiatedVideoFMTPs = append(
+			m.negotiatedVideoFMTPs, parseCodecFMTPs(m.negotiatedVideoCodecs[len(m.negotiatedVideoFMTPs):])...,
+		)
 	}
 
 	return joinedErr
@@ -719,19 +760,43 @@ func (m *MediaEngine) getCodecsByKind(typ RTPCodecType) []RTPCodecParameters {
 
 	if typ == RTPCodecTypeVideo {
 		if m.negotiatedVideo {
-			return m.negotiatedVideoCodecs
+			return slices.Clone(m.negotiatedVideoCodecs)
 		}
 
-		return m.videoCodecs
+		return slices.Clone(m.videoCodecs)
 	} else if typ == RTPCodecTypeAudio {
 		if m.negotiatedAudio {
-			return m.negotiatedAudioCodecs
+			return slices.Clone(m.negotiatedAudioCodecs)
 		}
 
-		return m.audioCodecs
+		return slices.Clone(m.audioCodecs)
 	}
 
 	return nil
+}
+
+// getCodecsAndFMTPsByKind is getCodecsByKind that also returns the parsed SDPFmtpLine
+// of each codec, for callers that search the list repeatedly. The returned slices are
+// owned by the MediaEngine and must not be modified.
+func (m *MediaEngine) getCodecsAndFMTPsByKind(typ RTPCodecType) ([]RTPCodecParameters, []fmtp.FMTP) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	if typ == RTPCodecTypeVideo {
+		if m.negotiatedVideo {
+			return m.negotiatedVideoCodecs, m.negotiatedVideoFMTPs
+		}
+
+		return m.videoCodecs, parseCodecFMTPs(m.videoCodecs)
+	} else if typ == RTPCodecTypeAudio {
+		if m.negotiatedAudio {
+			return m.negotiatedAudioCodecs, m.negotiatedAudioFMTPs
+		}
+
+		return m.audioCodecs, parseCodecFMTPs(m.audioCodecs)
+	}
+
+	return nil, nil
 }
 
 //nolint:cyclop

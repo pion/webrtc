@@ -339,6 +339,9 @@ func (d *DataChannel) handleOpen(dc *datachannel.DataChannel, isRemote, isAlread
 		if err := dc.Close(); err != nil {
 			d.log.Errorf("Failed to close DataChannel that was closed during connecting state %v", err.Error())
 		}
+		// Nothing reads from this channel, so the peer's stream reset will never
+		// be observed. Drop the channel but keep its stream identifier reserved.
+		d.sctpTransport.removeDataChannel(d, false)
 		d.onClose()
 
 		return
@@ -365,11 +368,13 @@ func (d *DataChannel) handleOpen(dc *datachannel.DataChannel, isRemote, isAlread
 	}
 
 	d.mu.Lock()
-	defer d.mu.Unlock()
-
 	if d.isGracefulClosed {
+		d.mu.Unlock()
+		d.sctpTransport.removeDataChannel(d, false)
+
 		return
 	}
+	defer d.mu.Unlock()
 
 	if !d.api.settingEngine.detach.DataChannels {
 		d.readLoopActive = make(chan struct{})
@@ -408,36 +413,45 @@ func (d *DataChannel) readLoop() {
 		defer close(readLoopActive)
 	}()
 
-	buffer := make([]byte, sctpMaxMessageSizeUnsetValue)
+	maxMessageSize := int64(d.api.settingEngine.getSCTPMaxMessageSize())
+	buffer := make([]byte, min(sctpMaxMessageSizeUnsetValue, maxMessageSize))
 	for {
 		n, isString, err := d.dataChannel.ReadDataChannel(buffer)
-		if err != nil {
-			if errors.Is(err, io.ErrShortBuffer) {
-				if int64(n) < int64(d.api.settingEngine.getSCTPMaxMessageSize()) {
-					buffer = append(buffer, make([]byte, len(buffer))...) // nolint
+		if err == nil {
+			d.onMessage(DataChannelMessage{
+				Data:     append([]byte{}, buffer[:n]...),
+				IsString: isString,
+			})
 
-					continue
-				}
-
-				d.log.Errorf(
-					"Incoming DataChannel message larger then Max Message size %v",
-					d.api.settingEngine.getSCTPMaxMessageSize(),
-				)
-			}
-
-			d.setReadyState(DataChannelStateClosed)
-			if !errors.Is(err, io.EOF) {
-				d.onError(err)
-			}
-			d.onClose()
-
-			return
+			continue
 		}
 
-		d.onMessage(DataChannelMessage{
-			Data:     append([]byte{}, buffer[:n]...),
-			IsString: isString,
-		})
+		if errors.Is(err, io.ErrShortBuffer) {
+			// ReadDataChannel leaves a message queued when the buffer is too small.
+			if int64(len(buffer)) < maxMessageSize {
+				buffer = make([]byte, min(2*int64(len(buffer)), maxMessageSize))
+
+				continue
+			}
+
+			d.log.Errorf("Incoming DataChannel message larger than maximum message size %v", maxMessageSize)
+
+			// Reset the stream when the message exceeds the receive limit.
+			if closeErr := d.dataChannel.Close(); closeErr != nil {
+				d.log.Errorf("Failed to close DataChannel after oversized message %v", closeErr.Error())
+			}
+		}
+
+		d.setReadyState(DataChannelStateClosed)
+		if !errors.Is(err, io.EOF) {
+			d.onError(err)
+		}
+		// io.EOF means the stream has been reset by the peer and the SCTP
+		// association has forgotten it, so its identifier can be used again.
+		d.sctpTransport.removeDataChannel(d, errors.Is(err, io.EOF))
+		d.onClose()
+
+		return
 	}
 }
 
@@ -739,9 +753,13 @@ func (d *DataChannel) getStatsID() string {
 
 func (d *DataChannel) collectStats(collector *statsReportCollector) {
 	collector.Collecting()
+	stats := d.stats()
+	collector.Collect(stats.ID, stats)
+}
 
-	d.mu.Lock()
-	defer d.mu.Unlock()
+func (d *DataChannel) stats() DataChannelStats {
+	d.mu.RLock()
+	defer d.mu.RUnlock()
 
 	stats := DataChannelStats{
 		Timestamp: statsTimestampNow(),
@@ -764,7 +782,7 @@ func (d *DataChannel) collectStats(collector *statsReportCollector) {
 		stats.BytesReceived = d.dataChannel.BytesReceived()
 	}
 
-	collector.Collect(stats.ID, stats)
+	return stats
 }
 
 func (d *DataChannel) setReadyState(r DataChannelState) {

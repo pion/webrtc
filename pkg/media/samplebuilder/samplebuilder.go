@@ -38,6 +38,10 @@ type SampleBuilder struct {
 	// prepared contains the samples that have been processed to date
 	prepared sampleSequenceLocation
 
+	// gap contains the slots that the packet being pushed added to filled, no
+	// packet is in them; it is only set for the duration of Push
+	gap sampleSequenceLocation
+
 	lastSampleTimestamp *uint32
 
 	// number of packets forced to be dropped
@@ -155,11 +159,13 @@ func (s *SampleBuilder) purgeConsumedLocation(consume sampleSequenceLocation, fo
 func (s *SampleBuilder) purgeBuffers(flush bool) {
 	s.purgeConsumedBuffers()
 
-	for (s.tooOld(s.filled) || (s.filled.count() > s.maxLate) || flush) && s.filled.hasData() {
+	for ((s.filled.count() > s.maxLate) || s.tooOld(s.filled) || flush) && s.filled.hasData() {
 		if s.active.empty() {
 			// refill the active based on the filled packets
 			s.active = s.filled
 		}
+
+		slots := s.purgeableSlots()
 
 		if s.active.hasData() && (s.active.head == s.filled.head) {
 			// attempt to force the active packet to be consumed even though
@@ -168,14 +174,39 @@ func (s *SampleBuilder) purgeBuffers(flush bool) {
 				continue
 			}
 
+			if s.filled.empty() {
+				// the last packets were dropped, nothing is left to purge
+				s.active = s.filled
+
+				break
+			}
+
 			// could not build the sample so drop it
-			s.active.head++
-			s.droppedPackets++
+			s.active.head += slots
+			s.droppedPackets += slots
 		}
 
 		s.releasePacket(s.filled.head)
-		s.filled.head++
+		s.filled.head += slots
 	}
+}
+
+// purgeableSlots returns how many slots purgeBuffers drops from filled.head in one step.
+// The size of gap is up to the sender of the packets, so its empty slots are not visited
+// one by one: as long as they are too late they are only counted as dropped.
+func (s *SampleBuilder) purgeableSlots() uint16 {
+	if s.gap.compare(s.filled.head) != slCompareInside || s.filled.count() <= s.maxLate {
+		return 1
+	}
+
+	slots := min(s.gap.tail-s.filled.head, s.filled.tail-s.filled.head-s.maxLate)
+
+	if ahead := s.active.head - s.filled.head; ahead != 0 {
+		// only the slots from active.head on count as dropped
+		slots = min(slots, ahead)
+	}
+
+	return slots
 }
 
 // Push adds an RTP Packet to s's buffer.
@@ -190,13 +221,16 @@ func (s *SampleBuilder) Push(packet *rtp.Packet) {
 		s.filled.head = packet.SequenceNumber
 		s.filled.tail = packet.SequenceNumber + 1
 	case slCompareBefore:
+		s.gap = sampleSequenceLocation{head: packet.SequenceNumber + 1, tail: s.filled.head}
 		s.filled.head = packet.SequenceNumber
 	case slCompareAfter:
+		s.gap = sampleSequenceLocation{head: s.filled.tail, tail: packet.SequenceNumber}
 		s.filled.tail = packet.SequenceNumber + 1
 	case slCompareInside:
 		break
 	}
 	s.purgeBuffers(false)
+	s.gap = sampleSequenceLocation{}
 }
 
 // Flush marks all samples in the buffer to be popped.
@@ -258,6 +292,12 @@ func (s *SampleBuilder) buildSample(purgingBuffers bool) *media.Sample {
 
 	// scan for any packet after the current and use that time stamp as the diff point
 	for i := consume.tail; i < s.active.tail; i++ {
+		if i == s.gap.head && s.gap.head < s.gap.tail {
+			// skip the slots that are known to be empty
+			i = s.gap.tail - 1
+
+			continue
+		}
 		if s.buffer[i] != nil {
 			afterTimestamp = s.buffer[i].Timestamp
 

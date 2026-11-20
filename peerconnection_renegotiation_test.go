@@ -973,6 +973,39 @@ func TestPeerConnection_Renegotiation_DisableTrack(t *testing.T) {
 	closePairNow(t, pcOffer, pcAnswer)
 }
 
+func TestPeerConnection_Renegotiation_PayloadTypesCommitWithAnswer(t *testing.T) {
+	lim := test.TimeOut(15 * time.Second)
+	defer lim.Stop()
+
+	pcOffer, pcAnswer, err := newPair()
+	require.NoError(t, err)
+	defer closePairNow(t, pcOffer, pcAnswer)
+
+	transceiver, err := pcOffer.AddTransceiverFromKind(RTPCodecTypeVideo)
+	require.NoError(t, err)
+	require.NoError(t, signalPair(pcOffer, pcAnswer))
+
+	const vp8PayloadType, vp9PayloadType = 96, 98
+	receiver := pcAnswer.GetReceivers()[0]
+	require.True(t, receiver.acceptsPayloadType(vp8PayloadType))
+	vp9 := findCodecByPayload(transceiver.getCodecs(), vp9PayloadType)
+	require.NotNil(t, vp9)
+	require.NoError(t, transceiver.SetCodecPreferences([]RTPCodecParameters{*vp9}))
+
+	offer, err := pcOffer.CreateOffer(nil)
+	require.NoError(t, err)
+	require.NoError(t, pcOffer.SetLocalDescription(offer))
+	require.NoError(t, pcAnswer.SetRemoteDescription(offer))
+	assert.True(t, receiver.acceptsPayloadType(vp8PayloadType))
+
+	answer, err := pcAnswer.CreateAnswer(nil)
+	require.NoError(t, err)
+	require.NoError(t, pcAnswer.SetLocalDescription(answer))
+	assert.False(t, receiver.acceptsPayloadType(vp8PayloadType))
+	assert.True(t, receiver.acceptsPayloadType(vp9PayloadType))
+	require.NoError(t, pcOffer.SetRemoteDescription(answer))
+}
+
 func TestPeerConnection_Renegotiation_Simulcast(t *testing.T) {
 	lim := test.TimeOut(time.Second * 30)
 	defer lim.Stop()

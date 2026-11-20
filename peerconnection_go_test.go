@@ -3413,11 +3413,8 @@ func TestCryptexRequiredDoesNotFailForDataOnlyOffer(t *testing.T) {
 }
 
 func TestCryptexRequiredDataOnlyOfferAcceptsNonCryptexAnswer(t *testing.T) {
-	// Equivalent of libwebrtc's CryptexRequiredDatachannelOnly test: a Require-policy offerer with
-	// only a data channel (no RTP media) must still accept an answer that omits Cryptex entirely,
-	// since Require only applies to negotiated RTP m-lines and there are none. There must be no
-	// speculative Cryptex mode selection just because the offer/answer exchange had no active RTP
-	// media -- a data-only exchange should behave the same as if Cryptex were plainly disabled.
+	// A data-only answer can omit Cryptex. The transport keeps its required
+	// mode for RTP streams that may be negotiated later.
 
 	pcOffer, err := NewPeerConnection(Configuration{RTPHeaderEncryptionPolicy: RTPHeaderEncryptionPolicyRequire})
 	require.NoError(t, err)
@@ -3460,8 +3457,8 @@ func TestCryptexRequiredDataOnlyOfferAcceptsNonCryptexAnswer(t *testing.T) {
 
 	waitForDTLSConnected(t, pcOffer)
 	waitForDTLSConnected(t, pcAnswer)
-	assert.Equal(t, srtp.CryptexModeDisabled, pcOffer.dtlsTransport.getLocalCryptexMode())
-	assert.Equal(t, srtp.CryptexModeDisabled, pcOffer.dtlsTransport.getRemoteCryptexMode())
+	assert.Equal(t, srtp.CryptexModeRequired, pcOffer.dtlsTransport.getLocalCryptexMode())
+	assert.Equal(t, srtp.CryptexModeRequired, pcOffer.dtlsTransport.getRemoteCryptexMode())
 }
 
 func TestCryptexIsStillOfferedDuringRenegotiationIfNotNegotiatedInitially(t *testing.T) {

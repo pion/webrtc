@@ -230,7 +230,11 @@ var (
 	errPeerConnStateChangeInvalid                     = errors.New("invalid state change op")
 	errPeerConnStateChangeUnhandled                   = errors.New("unhandled state change op")
 	errPeerConnSDPTypeInvalidValueSetLocalDescription = errors.New("invalid SDP type supplied to SetLocalDescription()")
-	errPeerConnRemoteDescriptionWithoutMidValue       = errors.New(
+
+	errPeerConnRemoteOfferDTLSRoleConflict = errors.New(
+		"remote offer conflicts with the configured answering DTLS role",
+	)
+	errPeerConnRemoteDescriptionWithoutMidValue = errors.New(
 		"remoteDescription contained media section without mid value",
 	)
 	errPeerConnRemoteDescriptionNil                  = errors.New("remoteDescription has not been set yet")
@@ -239,6 +243,8 @@ var (
 	errPeerConnSimulcastMidRTPExtensionRequired      = errors.New("mid RTP Extensions required for Simulcast")
 	errPeerConnSimulcastStreamIDRTPExtensionRequired = errors.New("stream id RTP Extensions required for Simulcast")
 	errPeerConnSimulcastIncomingSSRCFailed           = errors.New("incoming SSRC failed Simulcast probing")
+	errPeerConnDataChannelNotOffered                 = errors.New("answer contains a data channel section that was not offered")
+	errPeerConnSimulcastRidNotOffered                = errors.New("answer contains a simulcast rid that was not offered")
 	errPeerConnAddTransceiverFromKindOnlyAcceptsOne  = errors.New(
 		"AddTransceiverFromKind only accepts one RTPTransceiverInit",
 	)

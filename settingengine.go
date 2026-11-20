@@ -405,6 +405,8 @@ func (e *SettingEngine) SetIncludeLoopbackCandidate(include bool) {
 // DTLSRolePassive:
 //
 //	Act as DTLS Server, wait for ClientHello
+//
+// Offers that require the opposite local role are rejected.
 func (e *SettingEngine) SetAnsweringDTLSRole(role DTLSRole) error {
 	if role != DTLSRoleClient && role != DTLSRoleServer {
 		return errSettingEngineSetAnsweringDTLSRole
@@ -584,6 +586,7 @@ func (e *SettingEngine) SetDTLSExtendedMasterSecret(extendedMasterSecret dtls.Ex
 }
 
 // SetDTLSClientAuth sets the client auth type for DTLS.
+// WebRTC requires a peer certificate even when DTLS client auth is optional.
 func (e *SettingEngine) SetDTLSClientAuth(clientAuth dtls.ClientAuthType) {
 	e.dtls.clientAuth = &clientAuth
 }

@@ -242,6 +242,11 @@ func (r *RTPSender) ReplaceTrack(track TrackLocal) error { //nolint:cyclop
 		return ErrRTPSenderNewTrackHasIncorrectEnvelope
 	}
 
+	// Stop only unbinds once, a track bound after it would never be released
+	if track != nil && r.hasStopped() {
+		return errRTPSenderStopped
+	}
+
 	var replacedTrack TrackLocal
 	var context *baseTrackLocalContext
 	for _, e := range r.trackEncodings {
@@ -279,9 +284,10 @@ func (r *RTPSender) ReplaceTrack(track TrackLocal) error { //nolint:cyclop
 		rtcpInterceptor: context.RTCPReader(),
 	})
 	if err != nil {
-		// Re-bind the original track
-		if _, reBindErr := replacedTrack.Bind(context); reBindErr != nil {
-			return reBindErr
+		if replacedTrack != nil {
+			if _, reBindErr := replacedTrack.Bind(context); reBindErr != nil {
+				return reBindErr
+			}
 		}
 
 		return err
@@ -307,6 +313,9 @@ func (r *RTPSender) Send(parameters RTPSendParameters) error {
 		return errRTPSenderSendAlreadyCalled
 	case r.trackEncodings[0].track == nil:
 		return errRTPSenderTrackRemoved
+	case r.hasStopped():
+		// Stop only unbinds once, a track bound after it would never be released
+		return errRTPSenderStopped
 	}
 
 	for idx := range r.trackEncodings {
@@ -480,13 +489,19 @@ func (r *RTPSender) SetReadDeadline(t time.Time) error {
 // will block before returning. 0 is forever.
 func (r *RTPSender) SetReadDeadlineSimulcast(deadline time.Time, rid string) error {
 	r.mu.RLock()
-	defer r.mu.RUnlock()
-
 	for _, t := range r.trackEncodings {
 		if t.track != nil && t.track.RID() == rid {
-			return t.srtpStream.SetReadDeadline(deadline)
+			stream := t.srtpStream
+			r.mu.RUnlock()
+
+			if stream == nil {
+				return errRTPSenderSendNotCalled
+			}
+
+			return stream.SetReadDeadline(deadline)
 		}
 	}
+	r.mu.RUnlock()
 
 	return fmt.Errorf("%w: %s", errRTPSenderNoTrackForRID, rid)
 }

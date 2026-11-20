@@ -19,6 +19,7 @@ import (
 	"github.com/pion/ice/v4"
 	"github.com/pion/logging"
 	"github.com/pion/sdp/v3"
+	"github.com/pion/webrtc/v4/internal/fmtp"
 )
 
 // trackDetails represents any media source that can be represented in a SDP
@@ -78,19 +79,32 @@ func filterTrackWithSSRC(incomingTracks []trackDetails, ssrc SSRC) []trackDetail
 //nolint:cyclop
 func trackDetailsFromSDP(
 	log logging.LeveledLogger,
-	s *sdp.SessionDescription,
+	description *sdp.SessionDescription,
 ) (incomingTracks []trackDetails) {
-	for _, media := range s.MediaDescriptions {
+	for _, media := range description.MediaDescriptions {
 		tracksInMediaSection := []trackDetails{}
 		rtxRepairFlows := map[uint64]uint64{}
 		fecRepairFlows := map[uint64]uint64{}
+
+		// Tracks and repair flows are looked up by SSRC so that the cost of handling
+		// an attribute doesn't grow with the number of attributes seen before it.
+		// A track removed by an ssrc-group is marked with empty ssrcs and dropped after the loop.
+		trackIndexes := map[SSRC]int{}
+		rtxRepairFlowsByBase := map[uint64]uint64{}
+		fecRepairFlowsByBase := map[uint64]uint64{}
+		removeTrackWithSSRC := func(ssrc SSRC) {
+			if i, ok := trackIndexes[ssrc]; ok {
+				tracksInMediaSection[i].ssrcs = nil
+				delete(trackIndexes, ssrc)
+			}
+		}
 
 		// Plan B can have multiple tracks in a single media section
 		streamID := ""
 		trackID := ""
 
 		// If media section is recvonly or inactive skip
-		direction := getPeerDirection(media, s)
+		direction := getPeerDirection(media, description)
 		if direction == RTPTransceiverDirectionRecvonly || direction == RTPTransceiverDirectionInactive {
 			continue
 		}
@@ -128,15 +142,11 @@ func trackDetailsFromSDP(
 							continue
 						}
 						rtxRepairFlows[rtxRepairFlow] = baseSsrc
-						tracksInMediaSection = filterTrackWithSSRC(
-							tracksInMediaSection,
-							SSRC(rtxRepairFlow),
-						) // Remove if rtx was added as track before
-						for i := range tracksInMediaSection {
-							if tracksInMediaSection[i].ssrcs[0] == SSRC(baseSsrc) {
-								repairSsrc := SSRC(rtxRepairFlow)
-								tracksInMediaSection[i].rtxSsrc = &repairSsrc
-							}
+						rtxRepairFlowsByBase[baseSsrc] = rtxRepairFlow
+						removeTrackWithSSRC(SSRC(rtxRepairFlow)) // Remove if rtx was added as track before
+						if i, ok := trackIndexes[SSRC(baseSsrc)]; ok {
+							repairSsrc := SSRC(rtxRepairFlow)
+							tracksInMediaSection[i].rtxSsrc = &repairSsrc
 						}
 					}
 				} else if split[0] == sdp.SemanticTokenForwardErrorCorrectionFramework {
@@ -156,15 +166,11 @@ func trackDetailsFromSDP(
 							continue
 						}
 						fecRepairFlows[fecRepairFlow] = baseSsrc
-						tracksInMediaSection = filterTrackWithSSRC(
-							tracksInMediaSection,
-							SSRC(fecRepairFlow),
-						) // Remove if fec was added as track before
-						for i := range tracksInMediaSection {
-							if tracksInMediaSection[i].ssrcs[0] == SSRC(baseSsrc) {
-								repairSsrc := SSRC(fecRepairFlow)
-								tracksInMediaSection[i].fecSsrc = &repairSsrc
-							}
+						fecRepairFlowsByBase[baseSsrc] = fecRepairFlow
+						removeTrackWithSSRC(SSRC(fecRepairFlow)) // Remove if fec was added as track before
+						if i, ok := trackIndexes[SSRC(baseSsrc)]; ok {
+							repairSsrc := SSRC(fecRepairFlow)
+							tracksInMediaSection[i].fecSsrc = &repairSsrc
 						}
 					}
 				}
@@ -202,13 +208,9 @@ func trackDetailsFromSDP(
 
 				isNewTrack := true
 				trackDetails := &trackDetails{}
-				for i := range tracksInMediaSection {
-					for j := range tracksInMediaSection[i].ssrcs {
-						if tracksInMediaSection[i].ssrcs[j] == SSRC(ssrc) {
-							trackDetails = &tracksInMediaSection[i]
-							isNewTrack = false
-						}
-					}
+				if i, ok := trackIndexes[SSRC(ssrc)]; ok {
+					trackDetails = &tracksInMediaSection[i]
+					isNewTrack = false
 				}
 
 				trackDetails.mid = midValue
@@ -217,24 +219,25 @@ func trackDetailsFromSDP(
 				trackDetails.id = trackID
 				trackDetails.ssrcs = []SSRC{SSRC(ssrc)}
 
-				for r, baseSsrc := range rtxRepairFlows {
-					if baseSsrc == ssrc {
-						repairSsrc := SSRC(r) //nolint:gosec // G115
-						trackDetails.rtxSsrc = &repairSsrc
-					}
+				if r, ok := rtxRepairFlowsByBase[ssrc]; ok {
+					repairSsrc := SSRC(r) //nolint:gosec // G115
+					trackDetails.rtxSsrc = &repairSsrc
 				}
-				for r, baseSsrc := range fecRepairFlows {
-					if baseSsrc == ssrc {
-						fecSsrc := SSRC(r) //nolint:gosec // G115
-						trackDetails.fecSsrc = &fecSsrc
-					}
+				if r, ok := fecRepairFlowsByBase[ssrc]; ok {
+					fecSsrc := SSRC(r) //nolint:gosec // G115
+					trackDetails.fecSsrc = &fecSsrc
 				}
 
 				if isNewTrack {
+					trackIndexes[SSRC(ssrc)] = len(tracksInMediaSection)
 					tracksInMediaSection = append(tracksInMediaSection, *trackDetails)
 				}
 			}
 		}
+
+		tracksInMediaSection = slices.DeleteFunc(tracksInMediaSection, func(t trackDetails) bool {
+			return len(t.ssrcs) == 0
+		})
 
 		if rids := getRids(media); len(rids) != 0 && trackID != "" && streamID != "" {
 			simulcastTrack := trackDetails{
@@ -245,10 +248,16 @@ func trackDetailsFromSDP(
 				rids:     []string{},
 			}
 			for _, rid := range rids {
+				// A rid the remote only wants to receive describes no incoming stream.
+				if rid.direction == sdpRidDirectionRecv {
+					continue
+				}
 				simulcastTrack.rids = append(simulcastTrack.rids, rid.id)
 			}
 
-			tracksInMediaSection = []trackDetails{simulcastTrack}
+			if len(simulcastTrack.rids) != 0 {
+				tracksInMediaSection = []trackDetails{simulcastTrack}
+			}
 		}
 
 		incomingTracks = append(incomingTracks, tracksInMediaSection...)
@@ -283,11 +292,19 @@ func trackDetailsToRTPReceiveParameters(trackDetails *trackDetails) RTPReceivePa
 
 func getRids(media *sdp.MediaDescription) []*simulcastRid { // nolint:cyclop
 	rids := []*simulcastRid{}
+	ridsByID := map[string]*simulcastRid{}
 	var simulcastAttr string
 	for _, attr := range media.Attributes {
 		if attr.Key == sdpAttributeRid {
 			split := strings.Split(attr.Value, " ")
-			rids = append(rids, &simulcastRid{id: split[0], attrValue: attr.Value})
+			rid := &simulcastRid{id: split[0], attrValue: attr.Value}
+			if len(split) > 1 {
+				rid.direction = split[1]
+			}
+			rids = append(rids, rid)
+			if _, ok := ridsByID[rid.id]; !ok {
+				ridsByID[rid.id] = rid
+			}
 		} else if attr.Key == sdpAttributeSimulcast {
 			simulcastAttr = attr.Value
 		}
@@ -300,19 +317,45 @@ func getRids(media *sdp.MediaDescription) []*simulcastRid { // nolint:cyclop
 		ridStates := strings.SplitSeq(simulcastAttr, ";")
 		for ridState := range ridStates {
 			if len(ridState) > 0 && ridState[:1] == "~" {
-				ridID := ridState[1:]
-				for _, rid := range rids {
-					if rid.id == ridID {
-						rid.paused = true
-
-						break
-					}
+				if rid, ok := ridsByID[ridState[1:]]; ok {
+					rid.paused = true
 				}
 			}
 		}
 	}
 
 	return rids
+}
+
+// checkAnswerRids rejects an answer that announces simulcast rids the matching
+// media section of our offer did not offer to receive. An answer may only keep
+// or drop the rids it was offered, it cannot add any (RFC 8853 Section 5.3.2).
+func checkAnswerRids(offer, answer *sdp.SessionDescription) error {
+	offeredRids := map[string]map[string]bool{}
+	for _, media := range offer.MediaDescriptions {
+		midValue := getMidValue(media)
+		offeredRids[midValue] = map[string]bool{}
+		for _, rid := range getRids(media) {
+			if rid.direction == sdpRidDirectionRecv {
+				offeredRids[midValue][rid.id] = true
+			}
+		}
+	}
+
+	for _, media := range answer.MediaDescriptions {
+		midValue := getMidValue(media)
+		for _, rid := range getRids(media) {
+			// A rid the remote only wants to receive cannot make us receive anything.
+			if rid.direction == sdpRidDirectionRecv {
+				continue
+			}
+			if !offeredRids[midValue][rid.id] {
+				return fmt.Errorf("%w: mid %q rid %q", errPeerConnSimulcastRidNotOffered, midValue, rid.id)
+			}
+		}
+	}
+
+	return nil
 }
 
 func addCandidatesToMediaDescriptions(
@@ -537,6 +580,26 @@ func addSenderSDP(
 	}
 }
 
+// hasCommonCodec checks the codecs from one offered media section.
+func hasCommonCodec(media *sdp.MediaDescription, codecs []RTPCodecParameters) bool {
+	offered, err := codecsFromMediaDescription(media)
+	if err != nil {
+		return false
+	}
+
+	offeredFMTPs := parseCodecFMTPs(offered)
+	for _, codec := range codecs {
+		if strings.EqualFold(codec.MimeType, MimeTypeRTX) {
+			continue
+		}
+		if _, match := codecParametersFuzzySearchParsed(codec, offered, offeredFMTPs); match != codecMatchNone {
+			return true
+		}
+	}
+
+	return false
+}
+
 //nolint:cyclop
 func addTransceiverSDP(
 	descr *sdp.SessionDescription,
@@ -566,6 +629,9 @@ func addTransceiverSDP(
 		WithPropertyAttribute(sdp.AttrKeyRTCPRsize)
 
 	codecs := transceiver.getCodecs()
+	if mediaSection.remoteOffer != nil && !hasCommonCodec(mediaSection.remoteOffer, codecs) {
+		codecs = nil
+	}
 	for _, codec := range codecs {
 		name := strings.TrimPrefix(codec.MimeType, "audio/")
 		name = strings.TrimPrefix(name, "video/")
@@ -581,7 +647,7 @@ func addTransceiverSDP(
 	}
 	if len(codecs) == 0 {
 		// If we are sender and we have no codecs throw an error early
-		if transceiver.Sender() != nil {
+		if mediaSection.remoteOffer == nil && transceiver.Sender() != nil {
 			return false, ErrSenderWithNoCodecs
 		}
 
@@ -593,6 +659,7 @@ func addTransceiverSDP(
 		// In addition this makes our SDP compliant with RFC 4566 Section 5.7:
 		// https://datatracker.ietf.org/doc/html/rfc4566#section-5.7
 		descr.WithMedia(&sdp.MediaDescription{
+			Attributes: []sdp.Attribute{{Key: sdp.AttrKeyMID, Value: midValue}},
 			MediaName: sdp.MediaName{
 				Media:   transceiver.kind.String(),
 				Port:    sdp.RangedPort{Value: 0},
@@ -622,7 +689,8 @@ func addTransceiverSDP(
 	parameters := mediaEngine.getRTPParametersByKind(transceiver.kind, directions)
 	for _, rtpExtension := range parameters.HeaderExtensions {
 		if mediaSection.matchExtensions != nil {
-			if _, enabled := mediaSection.matchExtensions[rtpExtension.URI]; !enabled {
+			// An answer may only echo the extension with the ID the remote media section offered.
+			if id, enabled := mediaSection.matchExtensions[rtpExtension.URI]; !enabled || id != rtpExtension.ID {
 				continue
 			}
 		}
@@ -673,11 +741,13 @@ func addTransceiverSDP(
 
 type simulcastRid struct {
 	id        string
+	direction string
 	attrValue string
 	paused    bool
 }
 
 type mediaSection struct {
+	remoteOffer     *sdp.MediaDescription
 	id              string
 	transceivers    []*RTPTransceiver
 	data            bool
@@ -1132,12 +1202,19 @@ func codecsFromMediaDescription(mediaDescr *sdp.MediaDescription) (out []RTPCode
 		MediaDescriptions: []*sdp.MediaDescription{mediaDescr},
 	}
 	codecMap := s.GetCodecMap()
+	seenPayloadTypes := map[uint8]struct{}{}
 
 	for _, payloadStr := range mediaDescr.MediaName.Formats {
 		payloadType, err := strconv.ParseUint(payloadStr, 10, 8)
 		if err != nil {
 			return nil, err
 		}
+
+		// A payload type identifies a single codec no matter how often the m= line repeats it.
+		if _, ok := seenPayloadTypes[uint8(payloadType)]; ok {
+			continue
+		}
+		seenPayloadTypes[uint8(payloadType)] = struct{}{}
 
 		codec, ok := codecMap[uint8(payloadType)]
 		if !ok {
@@ -1146,6 +1223,17 @@ func codecsFromMediaDescription(mediaDescr *sdp.MediaDescription) (out []RTPCode
 			}
 
 			return nil, fmt.Errorf("%w: payload type %d", errSDPPayloadTypeNotFound, payloadType)
+		}
+
+		mimeType := mediaDescr.MediaName.Media + "/" + codec.Name
+
+		// A missing clock rate (VP8/0, or no rate at all) is matched as the
+		// codec's default one, see fmtp.ClockRateEqual. Store the default as
+		// well, otherwise zero becomes the negotiated clock rate and is handed
+		// to senders and tracks.
+		clockRate := codec.ClockRate
+		if clockRate == 0 {
+			clockRate = fmtp.DefaultClockRate(mimeType)
 		}
 
 		channels := uint16(0)
@@ -1167,8 +1255,8 @@ func codecsFromMediaDescription(mediaDescr *sdp.MediaDescription) (out []RTPCode
 
 		out = append(out, RTPCodecParameters{
 			RTPCodecCapability: RTPCodecCapability{
-				mediaDescr.MediaName.Media + "/" + codec.Name,
-				codec.ClockRate,
+				mimeType,
+				clockRate,
 				channels,
 				codec.Fmtp,
 				feedback,

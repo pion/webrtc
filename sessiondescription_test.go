@@ -58,7 +58,7 @@ func TestSessionDescription_Unmarshal(t *testing.T) {
 	assert.Nil(t, desc.parsed)
 	parsed1, err := desc.Unmarshal()
 	assert.NotNil(t, parsed1)
-	assert.NotNil(t, desc.parsed)
+	assert.Nil(t, desc.parsed)
 	assert.NoError(t, err)
 	parsed2, err2 := desc.Unmarshal()
 	assert.NotNil(t, parsed2)
@@ -109,9 +109,9 @@ func TestHasICETrickleOption(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			desc := SessionDescription{Type: SDPTypeOffer, SDP: tc.sdp}
-			_, err := desc.Unmarshal()
+			parsed, err := desc.Unmarshal()
 			assert.NoError(t, err)
-			assert.Equal(t, tc.expected, hasICETrickleOption(desc.parsed))
+			assert.Equal(t, tc.expected, hasICETrickleOption(parsed))
 		})
 	}
 }

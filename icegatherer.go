@@ -7,6 +7,7 @@ package webrtc
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -190,6 +191,13 @@ func (g *ICEGatherer) buildAgentOptions() ([]ice.AgentOption, error) {
 	options := g.baseAgentOptions(mDNSMode)
 	if len(candidateTypes) > 0 {
 		options = append(options, ice.WithCandidateTypes(candidateTypes))
+
+		// Active ICE-TCP candidates are host candidates that are created when a remote
+		// passive candidate is added, not while gathering, so WithCandidateTypes alone
+		// doesn't restrict them. Disable them when the policy excludes host candidates.
+		if !slices.Contains(candidateTypes, ice.CandidateTypeHost) {
+			options = append(options, ice.WithDisableActiveTCP())
+		}
 	}
 
 	options = append(options, g.credentialOptions()...)
@@ -548,6 +556,11 @@ func (g *ICEGatherer) close(shouldGracefullyClose bool) error {
 	defer g.lock.Unlock()
 
 	if g.agent == nil {
+		// Closing is terminal even if no agent was ever created, otherwise a
+		// later Gather/GetLocalParameters/AddRemoteCandidate would create an
+		// agent that nothing closes.
+		g.setState(ICEGathererStateClosed)
+
 		return nil
 	}
 	if shouldGracefullyClose {
