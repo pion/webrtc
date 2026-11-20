@@ -660,7 +660,30 @@ func TestDTLSTransport_verifyPeerCertificateFunc_ParseError(t *testing.T) {
 	rawCert := []byte("not a certificate")
 	err := transport.verifyPeerCertificateFunc()([][]byte{rawCert}, nil)
 	assert.Error(t, err)
-	assert.Equal(t, rawCert, transport.GetRemoteCertificate())
+	assert.Nil(t, transport.GetRemoteCertificate())
+}
+
+func TestDTLSTransport_verifyPeerCertificateFunc_FingerprintMismatch(t *testing.T) {
+	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	require.NoError(t, err)
+	certificate, err := GenerateCertificate(key)
+	require.NoError(t, err)
+	fingerprints, err := certificate.GetFingerprints()
+	require.NoError(t, err)
+	rawCerts := [][]byte{certificate.x509Cert.Raw}
+
+	transport := &DTLSTransport{api: NewAPI(), remoteParameters: DTLSParameters{
+		Fingerprints: []DTLSFingerprint{{Algorithm: "sha-256", Value: "00"}},
+	}}
+	err = transport.verifyPeerCertificateFunc()(rawCerts, nil)
+	assert.ErrorIs(t, err, errNoMatchingCertificateFingerprint)
+	assert.Nil(t, transport.GetRemoteCertificate())
+	assert.Nil(t, transport.remoteCertificates)
+
+	transport.remoteParameters.Fingerprints = fingerprints
+	require.NoError(t, transport.verifyPeerCertificateFunc()(rawCerts, nil))
+	assert.Equal(t, rawCerts[0], transport.GetRemoteCertificate())
+	assert.Equal(t, rawCerts, transport.remoteCertificates)
 }
 
 func TestDTLSTransport_toDTLSServerOptions_IncludesOptionalOptions(t *testing.T) {
