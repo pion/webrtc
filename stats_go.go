@@ -7,8 +7,11 @@ package webrtc
 
 import (
 	"context"
+	"crypto"
 	"sync"
 	"time"
+
+	"github.com/pion/dtls/v4/pkg/crypto/fingerprint"
 )
 
 // GetConnectionStats is a helper method to return the associated stats for a given PeerConnection.
@@ -84,8 +87,11 @@ func (r StatsReport) GetICECandidatePairStats(c *ICECandidatePair) (ICECandidate
 
 // GetCertificateStats is a helper method to return the associated stats for a given Certificate.
 func (r StatsReport) GetCertificateStats(c *Certificate) (CertificateStats, bool) {
-	statsID := c.statsID
-	stats, ok := r[statsID]
+	fp, err := fingerprint.Fingerprint(c.x509Cert, crypto.SHA256)
+	if err != nil {
+		return CertificateStats{}, false
+	}
+	stats, ok := r["certificate-"+fp]
 	if !ok {
 		return CertificateStats{}, false
 	}
