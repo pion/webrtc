@@ -584,19 +584,23 @@ func (t *DTLSTransport) verifyPeerCertificateFunc() func([][]byte, [][]*x509.Cer
 
 		t.lock.Lock()
 		defer t.lock.Unlock()
-		t.remoteCertificate = rawCerts[0]
-		t.remoteCertificates = rawCerts
 
 		if t.api.settingEngine.disableCertificateFingerprintVerification {
+			t.remoteCertificate, t.remoteCertificates = rawCerts[0], rawCerts
+
 			return nil
 		}
 
-		parsedRemoteCert, err := x509.ParseCertificate(t.remoteCertificate)
+		parsedRemoteCert, err := x509.ParseCertificate(rawCerts[0])
 		if err != nil {
 			return err
 		}
+		if err = t.validateFingerPrint(parsedRemoteCert); err != nil {
+			return err
+		}
+		t.remoteCertificate, t.remoteCertificates = rawCerts[0], rawCerts
 
-		return t.validateFingerPrint(parsedRemoteCert)
+		return nil
 	}
 }
 
