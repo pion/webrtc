@@ -82,7 +82,6 @@ type RTPCodecParameters struct {
 	RTPCodecCapability
 	PayloadType PayloadType
 
-	statsID string
 	// Resolved when the codec is registered or negotiated; nil means no valid apt.
 	rtxPayloadType *PayloadType
 }
