@@ -38,7 +38,8 @@ type SampleBuilder struct {
 	// prepared contains the samples that have been processed to date
 	prepared sampleSequenceLocation
 
-	lastSampleTimestamp *uint32
+	lastSampleTimestamp    uint32
+	hasLastSampleTimestamp bool
 
 	// number of packets forced to be dropped
 	droppedPackets uint16
@@ -273,7 +274,7 @@ func (s *SampleBuilder) buildSample(purgingBuffers bool) *media.Sample {
 	if !s.depacketizer.IsPartitionHead(s.buffer[consume.head].Payload) {
 		isPadding := false
 		for i := consume.head; i != consume.tail; i++ {
-			if s.lastSampleTimestamp != nil && *s.lastSampleTimestamp == s.buffer[i].Timestamp && len(s.buffer[i].Payload) == 0 {
+			if s.hasLastSampleTimestamp && s.lastSampleTimestamp == s.buffer[i].Timestamp && len(s.buffer[i].Payload) == 0 {
 				isPadding = true
 			}
 		}
@@ -319,8 +320,8 @@ func (s *SampleBuilder) buildSample(purgingBuffers bool) *media.Sample {
 
 	s.droppedPackets = 0
 	s.paddingPackets = 0
-	s.lastSampleTimestamp = new(uint32)
-	*s.lastSampleTimestamp = sampleTimestamp
+	s.lastSampleTimestamp = sampleTimestamp
+	s.hasLastSampleTimestamp = true
 
 	s.preparedSamples[s.prepared.tail] = sample
 	s.prepared.tail++
