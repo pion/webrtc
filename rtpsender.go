@@ -315,6 +315,7 @@ func (r *RTPSender) Send(parameters RTPSendParameters) error {
 		trackEncoding := r.trackEncodings[idx]
 		srtpStream := &trackStreamFuture{
 			ssrc:      parameters.Encodings[idx].SSRC,
+			rtxSSRC:   parameters.Encodings[idx].RTX.SSRC,
 			transport: r.transport,
 			ready:     r.transport.srtpReady,
 			stopped:   r.stopCalled,
