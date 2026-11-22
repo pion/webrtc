@@ -115,8 +115,7 @@ func (api *API) newDataChannel(
 
 // open opens the datachannel over the sctp transport.
 func (d *DataChannel) open(sctpTransport *SCTPTransport) error { //nolint:cyclop
-	association := sctpTransport.association()
-	if association == nil {
+	if sctpTransport.association() == nil {
 		return errSCTPNotEstablished
 	}
 
@@ -164,25 +163,32 @@ func (d *DataChannel) open(sctpTransport *SCTPTransport) error { //nolint:cyclop
 		LoggerFactory:        d.api.settingEngine.LoggerFactory,
 	}
 
-	if d.id == nil {
-		// avoid holding lock when generating ID, since id generation locks
-		d.mu.Unlock()
-		var dcID *uint16
-		err := d.sctpTransport.generateAndSetDataChannelID(d.sctpTransport.dtlsTransport.role(), &dcID)
-		if err != nil {
+	id := d.id
+	d.mu.Unlock()
+
+	if id == nil {
+		if err := sctpTransport.generateAndSetDataChannelID(sctpTransport.dtlsTransport.role(), d, &id); err != nil {
+			d.setReadyState(DataChannelStateClosed)
+
 			return err
 		}
-		d.mu.Lock()
-		d.id = dcID
 	}
-	dc, err := datachannel.Dial(association, *d.id, cfg)
+	stream, err := sctpTransport.openDataChannelStream(d, *id)
 	if err != nil {
-		d.mu.Unlock()
+		d.setReadyState(DataChannelStateClosed)
 
 		return err
 	}
+	dc, err := datachannel.Client(stream, cfg)
+	if err != nil {
+		d.setReadyState(DataChannelStateClosed)
+
+		return errors.Join(err, stream.Close())
+	}
 
 	// bufferedAmountLowThreshold and onBufferedAmountLow might be set earlier
+	d.mu.Lock()
+	d.id = id
 	dc.SetBufferedAmountLowThreshold(d.bufferedAmountLowThreshold)
 	dc.OnBufferedAmountLow(d.onBufferedAmountLow)
 	d.mu.Unlock()

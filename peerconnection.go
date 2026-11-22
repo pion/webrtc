@@ -2818,16 +2818,31 @@ func (pc *PeerConnection) CreateDataChannel(label string, options *DataChannelIn
 	}
 
 	pc.sctpTransport.lock.Lock()
-	pc.sctpTransport.dataChannels = append(pc.sctpTransport.dataChannels, dataChannel)
-	if dataChannel.ID() != nil {
-		pc.sctpTransport.dataChannelIDsUsed[*dataChannel.ID()] = struct{}{}
+	if id := dataChannel.ID(); id != nil {
+		owner := pc.sctpTransport.dataChannelIDsUsed[*id]
+		if owner.reserved() {
+			pc.sctpTransport.lock.Unlock()
+
+			return nil, errDataChannelIDInUse
+		}
+		owner.reservedBy = dataChannel
+		pc.sctpTransport.dataChannelIDsUsed[*id] = owner
 	}
+	pc.sctpTransport.dataChannels = append(pc.sctpTransport.dataChannels, dataChannel)
 	pc.sctpTransport.dataChannelsRequested++
+	connected := pc.sctpTransport.state == SCTPTransportStateConnected
 	pc.sctpTransport.lock.Unlock()
 
-	// If SCTP already connected open all the channels
-	if pc.sctpTransport.State() == SCTPTransportStateConnected {
+	// Open now if Start has already collected the queued channels.
+	if connected {
 		if err = dataChannel.open(pc.sctpTransport); err != nil {
+			pc.sctpTransport.lock.Lock()
+			pc.sctpTransport.dataChannels = slices.DeleteFunc(pc.sctpTransport.dataChannels, func(channel *DataChannel) bool {
+				return channel == dataChannel
+			})
+			pc.sctpTransport.dataChannelsRequested--
+			pc.sctpTransport.lock.Unlock()
+
 			return nil, err
 		}
 	}

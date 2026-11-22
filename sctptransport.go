@@ -12,6 +12,7 @@ import (
 	"net"
 	"sync"
 	"time"
+	"weak"
 
 	"github.com/pion/datachannel"
 	"github.com/pion/logging"
@@ -20,6 +21,19 @@ import (
 )
 
 const sctpMaxChannels = uint16(65535)
+
+var errDataChannelIDInUse = errors.New("data channel ID is in use")
+
+type dataChannelStreamOwner struct {
+	reservedBy *DataChannel
+	// Once bound, ownership follows the SCTP stream, including detached channels.
+	// Keep reset streams eligible for collection even while the ID remains used.
+	stream weak.Pointer[sctp.Stream]
+}
+
+func (owner dataChannelStreamOwner) reserved() bool {
+	return owner.reservedBy != nil && owner.reservedBy.ReadyState() == DataChannelStateConnecting
+}
 
 func newSCTPTransportMetadata(metadata sctp.AssociationMetadata) SCTPTransportMetadata {
 	partialReliabilityMode := SCTPTransportPartialReliabilityModeNone
@@ -68,7 +82,7 @@ type SCTPTransport struct {
 
 	// DataChannels
 	dataChannels          []*DataChannel
-	dataChannelIDsUsed    map[uint16]struct{}
+	dataChannelIDsUsed    map[uint16]dataChannelStreamOwner
 	dataChannelsOpened    uint32
 	dataChannelsRequested uint32
 	dataChannelsAccepted  uint32
@@ -88,7 +102,7 @@ func (api *API) NewSCTPTransport(dtls *DTLSTransport) *SCTPTransport {
 		state:              SCTPTransportStateConnecting,
 		api:                api,
 		log:                api.settingEngine.LoggerFactory.NewLogger("ortc"),
-		dataChannelIDsUsed: make(map[uint16]struct{}),
+		dataChannelIDsUsed: make(map[uint16]dataChannelStreamOwner),
 	}
 
 	res.updateMaxChannels()
@@ -190,7 +204,7 @@ func (r *SCTPTransport) StartContext(ctx context.Context, capabilities SCTPCapab
 	r.dataChannelsOpened += openedDCCount
 	r.lock.Unlock()
 
-	go r.acceptDataChannels(sctpAssociation, dataChannels)
+	go r.acceptDataChannels(sctpAssociation)
 
 	return nil
 }
@@ -254,112 +268,79 @@ func (r *SCTPTransport) Stop() error {
 	r.sctpAssociation.Abort("")
 
 	r.sctpAssociation = nil
+	clear(r.dataChannelIDsUsed)
 	r.state = SCTPTransportStateClosed
 
 	return nil
 }
 
-// openedDataChannels returns the underlying channels of the DataChannels that
-// currently own an SCTP stream: the ones registered with the transport plus the
-// given ones, which are still tracked when Detach has removed them from the
-// transport. The remote may send on one of these streams before the DataChannel
-// is opened locally (negotiated channels, or a remote that ignores the DTLS role
-// parity of RFC 8832), and such a stream must not be accepted a second time.
-func (r *SCTPTransport) openedDataChannels(existingDataChannels []*DataChannel) []*datachannel.DataChannel {
-	r.lock.RLock()
-	dataChannels := make([]*DataChannel, 0, len(r.dataChannels)+len(existingDataChannels))
-	dataChannels = append(dataChannels, r.dataChannels...)
-	r.lock.RUnlock()
-	dataChannels = append(dataChannels, existingDataChannels...)
-
-	opened := make([]*datachannel.DataChannel, 0, len(dataChannels))
-	for _, dc := range dataChannels {
-		if dc.ReadyState() == DataChannelStateClosed {
-			continue
-		}
-		dc.mu.RLock()
-		channel := dc.dataChannel
-		dc.mu.RUnlock()
-		if channel != nil {
-			opened = append(opened, channel)
-		}
-	}
-
-	return opened
-}
-
-// claimDataChannelID records that the remote opened a DataChannel on the given
-// stream identifier. It fails if a DataChannel created locally already reserved
-// it: the remote can create a stream in the association before the local
-// DataChannel is opened, and generateAndSetDataChannelID cannot see such
-// streams. An identifier of the local DTLS role's parity can only have been
-// reserved locally (RFC 8832 section 6.1), any other one the remote may reuse
-// after the DataChannel that used it was closed.
-func (r *SCTPTransport) claimDataChannelID(dtlsRole DTLSRole, id uint16) bool {
-	localParity := uint16(0)
-	if dtlsRole != DTLSRoleClient {
-		localParity++
-	}
-
+func (r *SCTPTransport) openDataChannelStream(channel *DataChannel, id uint16) (*sctp.Stream, error) {
 	r.lock.Lock()
 	defer r.lock.Unlock()
 
-	if _, ok := r.dataChannelIDsUsed[id]; ok && id%2 == localParity {
+	owner := r.dataChannelIDsUsed[id]
+	if owner.reservedBy != channel && owner.reserved() {
+		return nil, errDataChannelIDInUse
+	}
+	if owner.reservedBy == channel {
+		owner.reservedBy = nil
+		r.dataChannelIDsUsed[id] = owner
+	}
+	if r.sctpAssociation == nil {
+		return nil, errSCTPNotEstablished
+	}
+	stream, err := r.sctpAssociation.OpenStream(id, sctp.PayloadTypeWebRTCBinary)
+	if err != nil {
+		return nil, err
+	}
+	if owner.stream.Value() == stream || stream.State() != sctp.StreamStateOpen {
+		return nil, errDataChannelIDInUse
+	}
+	r.dataChannelIDsUsed[id] = dataChannelStreamOwner{stream: weak.Make(stream)}
+
+	return stream, nil
+}
+
+func (r *SCTPTransport) claimIncomingDataChannelStream(assoc *sctp.Association, stream *sctp.Stream) bool {
+	r.lock.Lock()
+	defer r.lock.Unlock()
+
+	id := stream.StreamIdentifier()
+	owner := r.dataChannelIDsUsed[id]
+	if r.sctpAssociation != assoc || owner.reserved() || owner.stream.Value() == stream ||
+		stream.State() != sctp.StreamStateOpen {
 		return false
 	}
-	r.dataChannelIDsUsed[id] = struct{}{}
+	r.dataChannelIDsUsed[id] = dataChannelStreamOwner{stream: weak.Make(stream)}
 
 	return true
 }
 
 //nolint:cyclop
-func (r *SCTPTransport) acceptDataChannels(
-	assoc *sctp.Association,
-	existingDataChannels []*DataChannel,
-) {
-ACCEPT:
-	for {
-		// check if the association has been stopped before calling accept.
-		r.lock.RLock()
-		currentAssoc := r.sctpAssociation
-		shouldStop := currentAssoc == nil || currentAssoc != assoc
-		r.lock.RUnlock()
-		if shouldStop {
-			r.onClose(nil)
-
-			return
-		}
-
-		// DataChannels created after the association came up own streams too,
-		// so the list cannot be computed once before the loop.
-		dataChannels := r.openedDataChannels(existingDataChannels)
-		dc, err := datachannel.Accept(assoc, &datachannel.Config{
-			LoggerFactory: r.api.settingEngine.LoggerFactory,
-		}, dataChannels...)
+func (r *SCTPTransport) acceptDataChannels(assoc *sctp.Association) {
+	for r.association() == assoc {
+		stream, err := assoc.AcceptStream()
 		if err != nil {
-			if !errors.Is(err, io.EOF) {
-				r.log.Errorf("Failed to accept data channel: %v", err)
-				r.onError(err)
-				r.onClose(err)
-			} else {
-				r.onClose(nil)
-			}
+			break
+		}
+		// Check the ownership of this stream before reading DCEP or sending an ACK.
+		if !r.claimIncomingDataChannelStream(assoc, stream) {
+			continue
+		}
+
+		stream.SetDefaultPayloadType(sctp.PayloadTypeWebRTCBinary)
+		dc, err := datachannel.Server(stream, &datachannel.Config{
+			LoggerFactory: r.api.settingEngine.LoggerFactory,
+		})
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		if err != nil {
+			r.log.Errorf("Failed to accept data channel: %v", err)
+			r.onError(err)
+			r.onClose(err)
 
 			return
-		}
-		for _, ch := range dataChannels {
-			if ch.StreamIdentifier() == dc.StreamIdentifier() {
-				continue ACCEPT
-			}
-		}
-		// A DataChannel may also have been opened locally on this stream while
-		// Accept was blocked waiting for the remote's DATA_CHANNEL_OPEN. The
-		// local DataChannel keeps the stream and the remote's open is ignored.
-		if !r.claimDataChannelID(r.dtlsTransport.role(), dc.StreamIdentifier()) {
-			r.log.Warnf("Ignoring remote data channel on stream %d which is used by a local data channel",
-				dc.StreamIdentifier())
-
-			continue ACCEPT
 		}
 
 		var (
@@ -407,7 +388,7 @@ ACCEPT:
 			r.log.Errorf("Failed to accept data channel: %v", err)
 			r.onError(err)
 			// We've received a datachannel with invalid configuration. We can still receive other datachannels.
-			continue ACCEPT
+			continue
 		}
 
 		<-r.onDataChannel(rtcDC)
@@ -422,6 +403,8 @@ ACCEPT:
 			handler(rtcDC)
 		}
 	}
+
+	r.onClose(nil)
 }
 
 // OnError sets an event handler which is invoked when the SCTP Association errors.
@@ -478,13 +461,6 @@ func (r *SCTPTransport) onDataChannel(dc *DataChannel) (done chan struct{}) {
 	r.lock.Lock()
 	r.dataChannels = append(r.dataChannels, dc)
 	r.dataChannelsAccepted++
-	if dc.ID() != nil {
-		r.dataChannelIDsUsed[*dc.ID()] = struct{}{}
-	} else {
-		// This cannot happen, the constructor for this datachannel in the caller
-		// takes a pointer to the id.
-		r.log.Errorf("accepted data channel with no ID")
-	}
 	handler := r.onDataChannelHandler
 	r.lock.Unlock()
 
@@ -577,14 +553,15 @@ func (r *SCTPTransport) collectStats(collector *statsReportCollector) {
 	collector.Collect(stats.ID, stats)
 }
 
-func (r *SCTPTransport) generateAndSetDataChannelID(dtlsRole DTLSRole, idOut **uint16) error {
+func (r *SCTPTransport) generateAndSetDataChannelID(
+	dtlsRole DTLSRole, channel *DataChannel, idOut **uint16,
+) error {
 	var id uint16
 	if dtlsRole != DTLSRoleClient {
 		id++
 	}
 
 	maxVal := r.MaxChannels()
-
 	r.lock.Lock()
 	defer r.lock.Unlock()
 
@@ -593,7 +570,7 @@ func (r *SCTPTransport) generateAndSetDataChannelID(dtlsRole DTLSRole, idOut **u
 			continue
 		}
 		*idOut = &id
-		r.dataChannelIDsUsed[id] = struct{}{}
+		r.dataChannelIDsUsed[id] = dataChannelStreamOwner{reservedBy: channel}
 
 		return nil
 	}
