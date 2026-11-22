@@ -24,14 +24,11 @@ import (
 func TestGenerateDataChannelID(t *testing.T) {
 	sctpTransportWithChannels := func(ids []uint16) *SCTPTransport {
 		ret := &SCTPTransport{
-			dataChannels:       []*DataChannel{},
-			dataChannelIDsUsed: make(map[uint16]struct{}),
+			dataChannelIDsUsed: make(map[uint16]dataChannelStreamOwner),
 		}
 
-		for i := range ids {
-			id := ids[i]
-			ret.dataChannels = append(ret.dataChannels, &DataChannel{id: &id})
-			ret.dataChannelIDsUsed[id] = struct{}{}
+		for _, id := range ids {
+			ret.dataChannelIDsUsed[id] = dataChannelStreamOwner{}
 		}
 
 		return ret
@@ -54,11 +51,9 @@ func TestGenerateDataChannelID(t *testing.T) {
 		{DTLSRoleServer, sctpTransportWithChannels([]uint16{1, 5}), 3},
 	}
 	for _, testCase := range testCases {
-		idPtr := new(uint16)
-		err := testCase.s.generateAndSetDataChannelID(testCase.role, &idPtr)
+		id, err := testCase.s.nextDataChannelID(testCase.role)
 		assert.NoError(t, err, "failed to generate data channel id")
-		assert.Equal(t, testCase.result, *idPtr)
-		assert.Contains(t, testCase.s.dataChannelIDsUsed, *idPtr, "expected new id to be added to the map")
+		assert.Equal(t, testCase.result, id)
 	}
 }
 

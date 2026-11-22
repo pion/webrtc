@@ -898,6 +898,53 @@ func TestDataChannelClose(t *testing.T) {
 	})
 }
 
+func TestDataChannelReopenStreamID(t *testing.T) {
+	offer, answer, err := newPair()
+	require.NoError(t, err)
+	defer closePairNow(t, offer, answer)
+
+	incoming := make(chan *DataChannel, 2)
+	answer.OnDataChannel(func(remote *DataChannel) {
+		remote.OnMessage(func(message DataChannelMessage) {
+			assert.NoError(t, remote.SendText(string(message.Data)))
+		})
+		incoming <- remote
+	})
+
+	id := uint16(11)
+	for round := range 2 {
+		channel, createErr := offer.CreateDataChannel("echo", &DataChannelInit{ID: &id})
+		require.NoError(t, createErr)
+		if round == 0 {
+			require.NoError(t, signalPairWithOptions(offer, answer, func(options *signalPairOptions) {
+				options.disableInitialDataChannel = true
+			}))
+		}
+
+		var remote *DataChannel
+		select {
+		case remote = <-incoming:
+		case <-time.After(5 * time.Second):
+			require.FailNow(t, "timed out opening data channel", "stream %d in round %d", id, round)
+		}
+		waitDataChannelOpen(t, channel)
+		require.NotNil(t, remote.ID())
+		require.Equal(t, id, *remote.ID())
+		replies := make(chan string, 1)
+		channel.OnMessage(func(message DataChannelMessage) { replies <- string(message.Data) })
+		if round > 0 {
+			_, duplicateErr := answer.CreateDataChannel("duplicate", &DataChannelInit{ID: &id})
+			require.ErrorIs(t, duplicateErr, errDataChannelIDInUse)
+		}
+		sendAndExpect(t, channel, replies, "echo")
+
+		require.NoError(t, channel.Close())
+		require.Eventually(t, func() bool {
+			return channel.ReadyState() == DataChannelStateClosed && remote.ReadyState() == DataChannelStateClosed
+		}, 5*time.Second, 10*time.Millisecond)
+	}
+}
+
 func TestDataChannel_DetachErrors(t *testing.T) {
 	t.Run("error errDetachNotEnabled", func(t *testing.T) {
 		s := SettingEngine{}

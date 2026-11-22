@@ -2928,19 +2928,8 @@ func (pc *PeerConnection) CreateDataChannel(label string, options *DataChannelIn
 		return nil, &rtcerr.TypeError{Err: ErrRetransmitsOrPacketLifeTime}
 	}
 
-	pc.sctpTransport.lock.Lock()
-	pc.sctpTransport.dataChannels = append(pc.sctpTransport.dataChannels, dataChannel)
-	if dataChannel.ID() != nil {
-		pc.sctpTransport.dataChannelIDsUsed[*dataChannel.ID()] = struct{}{}
-	}
-	pc.sctpTransport.dataChannelsRequested++
-	pc.sctpTransport.lock.Unlock()
-
-	// If SCTP already connected open all the channels
-	if pc.sctpTransport.State() == SCTPTransportStateConnected {
-		if err = dataChannel.open(pc.sctpTransport); err != nil {
-			return nil, err
-		}
+	if err = pc.sctpTransport.addDataChannel(dataChannel); err != nil {
+		return nil, err
 	}
 
 	pc.mu.Lock()
