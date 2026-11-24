@@ -221,7 +221,7 @@ func (r *SCTPTransport) sctpClientOptions(netConn net.Conn, maxMessageSize uint3
 }
 
 func (r *SCTPTransport) optionalSCTPClientOptions() []sctp.ClientOption {
-	opts := make([]sctp.ClientOption, 0, 7)
+	opts := make([]sctp.ClientOption, 0, 8)
 
 	if r.api.settingEngine.sctp.maxReceiveBufferSize != 0 {
 		opts = append(opts, sctp.WithMaxReceiveBufferSize(r.api.settingEngine.sctp.maxReceiveBufferSize))
@@ -239,6 +239,13 @@ func (r *SCTPTransport) optionalSCTPClientOptions() []sctp.ClientOption {
 		opts = append(
 			opts,
 			sctp.WithRTOMax(float64(r.api.settingEngine.sctp.rtoMax)/float64(time.Millisecond)),
+		)
+	}
+
+	if r.api.settingEngine.sctp.rtoMin > 0 {
+		opts = append(
+			opts,
+			sctp.WithRTOMin(float64(r.api.settingEngine.sctp.rtoMin)/float64(time.Millisecond)),
 		)
 	}
 

@@ -340,6 +340,15 @@ func TestSetSCTPRTOMax(t *testing.T) {
 	assert.Equal(t, expSize, s.sctp.rtoMax)
 }
 
+func TestSetSCTPRTOMin(t *testing.T) {
+	s := SettingEngine{}
+	assert.Equal(t, time.Duration(0), s.sctp.rtoMin)
+
+	expMin := 300 * time.Millisecond
+	s.SetSCTPRTOMin(expMin)
+	assert.Equal(t, expMin, s.sctp.rtoMin)
+}
+
 func TestSetICEUseCandidateCheckPriority(t *testing.T) {
 	settingEngine := SettingEngine{}
 	assert.False(t, settingEngine.iceUseCandidateCheckPriority)

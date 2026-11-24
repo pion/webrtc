@@ -88,6 +88,7 @@ type SettingEngine struct {
 		maxReceiveBufferSize uint32
 		enableZeroChecksum   bool
 		rtoMax               time.Duration
+		rtoMin               time.Duration
 		maxMessageSize       uint32
 		minCwnd              uint32
 		fastRtxWnd           uint32
@@ -676,6 +677,16 @@ func (e *SettingEngine) SetDTLSSupportedProtocols(protocols ...string) {
 // Leave this 0 for the default timeout.
 func (e *SettingEngine) SetSCTPRTOMax(rtoMax time.Duration) {
 	e.sctp.rtoMax = rtoMax
+}
+
+// SetSCTPRTOMin sets the minimum retransmission timeout.
+// Leave this 0 for the default timeout (1 second, as RFC 9260 recommends).
+// A lower value recovers sooner from a lost packet that fast retransmission
+// does not catch, such as the last one of a burst. It should stay above the
+// round trip plus the peer's delayed acknowledgement (200 ms), or packets that
+// were not lost are retransmitted.
+func (e *SettingEngine) SetSCTPRTOMin(rtoMin time.Duration) {
+	e.sctp.rtoMin = rtoMin
 }
 
 // SetSCTPMinCwnd sets the minimum congestion window size. The congestion window
