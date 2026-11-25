@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"io"
 	"testing"
+	"testing/iotest"
 
 	"github.com/stretchr/testify/require"
 )
@@ -158,4 +159,76 @@ func TestTrailing01AfterStartCode(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, nal)
 	}
+}
+
+func TestDataReturnedWithEOF(t *testing.T) {
+	idr := bytes.Repeat([]byte{0xAB}, 5000) // larger than the 4096 byte read buffer
+	idr[0] = 0x65
+	h264Bytes := []byte{
+		0x0, 0x0, 0x0, 0x1, 0x67, 0x1, 0x2, 0x3, // SPS
+		0x0, 0x0, 0x0, 0x1, 0x68, 0x1, 0x2, 0x3, // PPS
+		0x0, 0x0, 0x0, 0x1, // IDR
+	}
+	h264Bytes = append(h264Bytes, idr...)
+
+	readAll := func(stream io.Reader) []int {
+		reader, err := NewReader(stream)
+		require.NoError(t, err)
+
+		var nalSizes []int
+		for {
+			nal, err := reader.NextNAL()
+			if err != nil {
+				require.ErrorIs(t, err, io.EOF)
+
+				return nalSizes
+			}
+			nalSizes = append(nalSizes, len(nal.Data))
+		}
+	}
+
+	for _, test := range []struct {
+		input   []byte
+		nalSize []int
+	}{
+		{h264Bytes, []int{4, 4, 5000}},
+		{h264Bytes[:16], []int{4, 4}},
+	} {
+		require.Equal(t, test.nalSize, readAll(bytes.NewReader(test.input)))
+		require.Equal(t, test.nalSize, readAll(iotest.DataErrReader(bytes.NewReader(test.input))))
+		require.Equal(t, test.nalSize, readAll(iotest.OneByteReader(bytes.NewReader(test.input))))
+		require.Equal(t, test.nalSize, readAll(iotest.DataErrReader(iotest.OneByteReader(bytes.NewReader(test.input)))))
+	}
+}
+
+func TestReadAfterEOF(t *testing.T) {
+	// A stream that returns io.EOF and later has more data, like a file that is still being written.
+	stream := &bytes.Buffer{}
+	stream.Write([]byte{
+		0x0, 0x0, 0x0, 0x1, 0x67, 0x1, 0x2, 0x3, // SPS
+		0x0, 0x0, 0x0, 0x1, 0x68, 0x1, 0x2, 0x3, // PPS
+		0x0, 0x0, 0x0, 0x1,
+	})
+
+	reader, err := NewReader(stream)
+	require.NoError(t, err)
+
+	for {
+		_, err = reader.NextNAL()
+		if err != nil {
+			require.ErrorIs(t, err, io.EOF)
+
+			break
+		}
+	}
+
+	stream.Write([]byte{0x65, 0x9, 0x9, 0x9, 0x0, 0x0, 0x0, 0x1, 0x41, 0x7})
+
+	nal, err := reader.NextNAL()
+	require.NoError(t, err)
+	require.Equal(t, []byte{0x65, 0x9, 0x9, 0x9}, nal.Data)
+
+	nal, err = reader.NextNAL()
+	require.NoError(t, err)
+	require.Equal(t, []byte{0x41, 0x7}, nal.Data)
 }

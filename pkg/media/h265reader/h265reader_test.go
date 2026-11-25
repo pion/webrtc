@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"io"
 	"testing"
+	"testing/iotest"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -183,4 +184,78 @@ func TestNAL_parseHeader(t *testing.T) {
 	nal.parseHeader()
 
 	assert.True(t, nal.ForbiddenZeroBit)
+}
+
+func TestH265Reader_DataReturnedWithEOF(t *testing.T) {
+	idr := bytes.Repeat([]byte{0xAB}, 5000) // larger than the 4096 byte read buffer
+	idr[0], idr[1] = 0x26, 0x01             // IDR_W_RADL (type 19)
+	stream := []byte{
+		0x0, 0x0, 0x0, 0x1, 0x40, 0x01, 0x2, 0x3, // VPS
+		0x0, 0x0, 0x0, 0x1, 0x42, 0x01, 0x2, 0x3, // SPS
+		0x0, 0x0, 0x0, 0x1, // IDR_W_RADL
+	}
+	stream = append(stream, idr...)
+
+	readAll := func(r io.Reader) []int {
+		reader, err := NewReader(r)
+		assert.NoError(t, err)
+
+		var nalSizes []int
+		for {
+			nal, err := reader.NextNAL()
+			if err != nil {
+				assert.ErrorIs(t, err, io.EOF)
+
+				return nalSizes
+			}
+			nalSizes = append(nalSizes, len(nal.Data))
+		}
+	}
+
+	for _, test := range []struct {
+		input   []byte
+		nalSize []int
+	}{
+		{stream, []int{4, 4, 5000}},
+		{stream[:16], []int{4, 4}},
+	} {
+		assert.Equal(t, test.nalSize, readAll(bytes.NewReader(test.input)))
+		assert.Equal(t, test.nalSize, readAll(iotest.DataErrReader(bytes.NewReader(test.input))))
+		assert.Equal(t, test.nalSize, readAll(iotest.OneByteReader(bytes.NewReader(test.input))))
+		assert.Equal(t, test.nalSize, readAll(iotest.DataErrReader(iotest.OneByteReader(bytes.NewReader(test.input)))))
+	}
+}
+
+func TestH265Reader_ReadAfterEOF(t *testing.T) {
+	// A stream that returns io.EOF and later has more data, like a file that is still being written.
+	stream := &bytes.Buffer{}
+	stream.Write([]byte{
+		0x0, 0x0, 0x0, 0x1, 0x40, 0x1, 0x2, 0x3, // VPS
+		0x0, 0x0, 0x0, 0x1, 0x42, 0x1, 0x2, 0x3, // SPS
+		0x0, 0x0, 0x0, 0x1,
+	})
+
+	reader, err := NewReader(stream)
+	assert.NoError(t, err)
+
+	for {
+		_, err = reader.NextNAL()
+		if err != nil {
+			assert.ErrorIs(t, err, io.EOF)
+
+			break
+		}
+	}
+
+	stream.Write([]byte{0x26, 0x1, 0x9, 0x9, 0x0, 0x0, 0x0, 0x1, 0x2, 0x1, 0x7})
+
+	nal, err := reader.NextNAL()
+	if assert.NoError(t, err) && assert.NotNil(t, nal) {
+		assert.Equal(t, []byte{0x26, 0x1, 0x9, 0x9}, nal.Data)
+	}
+
+	nal, err = reader.NextNAL()
+	if assert.NoError(t, err) && assert.NotNil(t, nal) {
+		assert.Equal(t, []byte{0x2, 0x1, 0x7}, nal.Data)
+	}
 }

@@ -18,6 +18,7 @@ type H265Reader struct {
 	nalPrefixParsed             bool
 	readBuffer                  []byte
 	tmpReadBuf                  []byte
+	readErr                     error
 	includeSEI                  bool
 }
 
@@ -99,14 +100,24 @@ type NAL struct {
 
 func (reader *H265Reader) read(numToRead int) (data []byte, e error) {
 	for len(reader.readBuffer) < numToRead {
-		n, err := reader.stream.Read(reader.tmpReadBuf)
-		if err != nil {
+		if err := reader.readErr; err != nil {
+			// Report the error once, a later call reads the stream again.
+			reader.readErr = nil
+
 			return nil, err
+		}
+
+		n, err := reader.stream.Read(reader.tmpReadBuf)
+		// A Read can return data together with an error (e.g. io.EOF), keep the data.
+		reader.readBuffer = append(reader.readBuffer, reader.tmpReadBuf[0:n]...)
+		if err != nil {
+			reader.readErr = err
+
+			continue
 		}
 		if n == 0 {
 			break
 		}
-		reader.readBuffer = append(reader.readBuffer, reader.tmpReadBuf[0:n]...)
 	}
 
 	numShouldRead := min(numToRead, len(reader.readBuffer))
