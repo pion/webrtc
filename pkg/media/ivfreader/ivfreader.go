@@ -15,6 +15,11 @@ const (
 	ivfFileHeaderSignature = "DKIF"
 	ivfFileHeaderSize      = 32
 	ivfFrameHeaderSize     = 12
+
+	// maxPreallocatedFrameSize is the largest frame payload allocated up front.
+	// Larger payloads are read incrementally, so a corrupt frame size cannot
+	// cause a huge allocation before the data is actually present.
+	maxPreallocatedFrameSize = 1 << 20
 )
 
 var (
@@ -113,9 +118,18 @@ func (i *IVFReader) ParseNextFrame() ([]byte, *IVFFrameHeader, error) {
 		Timestamp: i.ptsToTimestamp(pts),
 	}
 
-	payload := make([]byte, header.FrameSize)
-	bytesRead, err = io.ReadFull(i.stream, payload)
-	if errors.Is(err, io.ErrUnexpectedEOF) {
+	var payload []byte
+	if header.FrameSize <= maxPreallocatedFrameSize {
+		payload = make([]byte, header.FrameSize)
+		bytesRead, err = io.ReadFull(i.stream, payload)
+	} else {
+		payload, err = io.ReadAll(io.LimitReader(i.stream, int64(header.FrameSize)))
+		bytesRead = len(payload)
+		if err == nil && int64(bytesRead) < int64(header.FrameSize) {
+			err = io.ErrUnexpectedEOF
+		}
+	}
+	if errors.Is(err, io.ErrUnexpectedEOF) || errors.Is(err, io.EOF) {
 		return nil, nil, errIncompleteFrameData
 	} else if err != nil {
 		return nil, nil, err

@@ -5,6 +5,7 @@ package ivfreader
 
 import (
 	"bytes"
+	"encoding/binary"
 	"io"
 	"testing"
 
@@ -170,4 +171,83 @@ func TestIVFReader_EOFWhenNoFramesLeft(t *testing.T) {
 	_, _, err = reader.ParseNextFrame()
 
 	assert.Equal(io.EOF, err)
+}
+
+func TestIVFReader_ParseHugeFrameSizeWithoutPayload(t *testing.T) {
+	assert := assert.New(t)
+
+	// frame header with frameSize of 0xFFFFFFFF but no payload
+	incompleteFrame := []byte{
+		0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00,
+	}
+
+	ivf := buildIVFContainer(&incompleteFrame)
+	reader, _, err := NewWith(ivf)
+	assert.Nil(err, "IVFReader should be created")
+	assert.NotNil(reader, "Reader shouldn't be nil")
+
+	payload, header, err := reader.ParseNextFrame()
+
+	assert.Nil(payload, "Incomplete payload should be nil")
+	assert.Nil(header, "Header should be nil")
+	assert.Equal(errIncompleteFrameData, err)
+}
+
+func TestIVFReader_ParseFrameHeaderWithoutPayload(t *testing.T) {
+	assert := assert.New(t)
+
+	// frame with header defining frameSize of 4 but no payload
+	incompleteFrame := []byte{
+		0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00,
+	}
+
+	ivf := buildIVFContainer(&incompleteFrame)
+	reader, _, err := NewWith(ivf)
+	assert.Nil(err, "IVFReader should be created")
+	assert.NotNil(reader, "Reader shouldn't be nil")
+
+	payload, header, err := reader.ParseNextFrame()
+
+	assert.Nil(payload, "Incomplete payload should be nil")
+	assert.Nil(header, "Header should be nil")
+	assert.Equal(errIncompleteFrameData, err)
+}
+
+func TestIVFReader_ParseLargeFrame(t *testing.T) {
+	assert := assert.New(t)
+
+	// frame larger than maxPreallocatedFrameSize, fully present
+	const largeFrameSize = maxPreallocatedFrameSize + 5
+	largePayload := bytes.Repeat([]byte{0xDE, 0xAD, 0xBE, 0xEF}, largeFrameSize/4+1)[:largeFrameSize]
+	largeFrame := binary.LittleEndian.AppendUint32(nil, largeFrameSize)
+	largeFrame = append(largeFrame, make([]byte, 8)...) // timestamp
+	largeFrame = append(largeFrame, largePayload...)
+
+	// Frame Length - 4
+	// Timestamp - None
+	// Frame Payload - 0xDEADBEEF
+	smallFrame := []byte{
+		0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00, 0xDE, 0xAD, 0xBE, 0xEF,
+	}
+
+	ivf := buildIVFContainer(&largeFrame, &smallFrame)
+	reader, _, err := NewWith(ivf)
+	assert.Nil(err, "IVFReader should be created")
+	assert.NotNil(reader, "Reader shouldn't be nil")
+
+	payload, header, err := reader.ParseNextFrame()
+
+	assert.Nil(err, "Should have parsed large frame without error")
+	assert.Equal(uint32(largeFrameSize), header.FrameSize)
+	assert.Equal(largePayload, payload)
+	assert.Equal(int64(ivfFrameHeaderSize+ivfFileHeaderSize+largeFrameSize), reader.bytesReadSuccesfully)
+
+	payload, header, err = reader.ParseNextFrame()
+
+	assert.Nil(err, "Should have parsed frame after large frame without error")
+	assert.Equal(uint32(4), header.FrameSize)
+	assert.Equal([]byte{0xDE, 0xAD, 0xBE, 0xEF}, payload)
 }
