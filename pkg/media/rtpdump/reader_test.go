@@ -110,6 +110,30 @@ func TestReader(t *testing.T) {
 			WantErr: errMalformed,
 		},
 		{
+			Name: "packet length shorter than packet header",
+			Data: append(
+				append(
+					validPreamble,
+					// header
+					0x00, 0x00, 0x00, 0x00,
+					0x00, 0x00, 0x00, 0x00,
+					0x00, 0x00, 0x00, 0x00,
+					0x00, 0x00, 0x00, 0x00,
+					// packet header len=4
+					0x00, 0x04, 0x00, 0x00,
+					0x00, 0x00, 0x00, 0x00,
+				),
+				// enough data for len-8 to wrap around to 65532
+				make([]byte, 65532)...,
+			),
+			WantHeader: Header{
+				Start:  time.Unix(0, 0).UTC(),
+				Source: net.IPv4(0, 0, 0, 0),
+				Port:   0,
+			},
+			WantErr: errMalformed,
+		},
+		{
 			Name: "valid rtcp packet",
 			Data: append(
 				validPreamble,

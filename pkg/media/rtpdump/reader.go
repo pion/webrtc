@@ -86,7 +86,7 @@ func (r *Reader) Next() (Packet, error) {
 		return Packet{}, err
 	}
 
-	if header.Length == 0 {
+	if header.Length < pktHeaderLen {
 		return Packet{}, errMalformed
 	}
 
