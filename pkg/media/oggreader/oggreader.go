@@ -423,7 +423,7 @@ func validateOpusTagsHeader(payload []byte, minHeaderLen int) error {
 
 func parseVendorString(payload []byte, headerMagicLen, u32Size, minHeaderLen int) (string, int, error) {
 	vendorLen32 := binary.LittleEndian.Uint32(payload[headerMagicLen : headerMagicLen+u32Size])
-	if int(vendorLen32) > len(payload)-minHeaderLen {
+	if int64(vendorLen32) > int64(len(payload)-minHeaderLen) {
 		return "", 0, fmt.Errorf("%w: payload too short for vendor string", errBadOpusTagsSignature)
 	}
 	vendorLen := int(vendorLen32)
@@ -441,7 +441,7 @@ func parseVendorString(payload []byte, headerMagicLen, u32Size, minHeaderLen int
 
 func parseUserComments(payload []byte, vendorEnd, u32Size int) ([]UserComment, error) {
 	userCommentCount32 := binary.LittleEndian.Uint32(payload[vendorEnd : vendorEnd+u32Size])
-	if int(userCommentCount32) > (len(payload)-vendorEnd)/u32Size {
+	if int64(userCommentCount32) > int64((len(payload)-vendorEnd)/u32Size) {
 		return nil, fmt.Errorf("%w: unreasonable comment count", errBadOpusTagsSignature)
 	}
 	userCommentCount := int(userCommentCount32)
@@ -469,10 +469,10 @@ func parseSingleUserComment(payload []byte, pos, u32Size, index int) (UserCommen
 	commentLen32 := binary.LittleEndian.Uint32(payload[pos : pos+u32Size])
 	pos += u32Size
 
-	commentLen := int(commentLen32)
-	if commentLen < 0 || pos+commentLen > len(payload) {
+	if int64(commentLen32) > int64(len(payload)-pos) {
 		return UserComment{}, 0, fmt.Errorf("%w: payload too short for comment %d", errBadOpusTagsSignature, index)
 	}
+	commentLen := int(commentLen32)
 
 	comment := string(payload[pos : pos+commentLen])
 	pos += commentLen

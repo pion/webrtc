@@ -778,6 +778,27 @@ func TestParseOpusTagsErrors(t *testing.T) {
 			errMessage: "vendor string",
 		},
 		{
+			name: "vendor length max uint32",
+			payload: func() []byte {
+				payload := makeHeader(24)
+				binary.LittleEndian.PutUint32(payload[8:], 0xFFFFFFFF)
+
+				return payload
+			}(),
+			errMessage: "vendor string",
+		},
+		{
+			name: "comment count max uint32",
+			payload: func() []byte {
+				payload := makeHeader(24)
+				binary.LittleEndian.PutUint32(payload[8:], 0)
+				binary.LittleEndian.PutUint32(payload[12:], 0xFFFFFFFF)
+
+				return payload
+			}(),
+			errMessage: "unreasonable comment count",
+		},
+		{
 			name: "unreasonable comment count",
 			payload: func() []byte {
 				payload := makeHeader(17) // 8 (magic) + 4 (vendor len) + 1 (vendor) + 4 (comment count)
@@ -807,6 +828,18 @@ func TestParseOpusTagsErrors(t *testing.T) {
 				binary.LittleEndian.PutUint32(payload[8:], 0)
 				binary.LittleEndian.PutUint32(payload[12:], 1)
 				binary.LittleEndian.PutUint32(payload[16:], 10) // comment claims 10 bytes, none available
+
+				return payload
+			}(),
+			errMessage: "comment 0",
+		},
+		{
+			name: "comment length near max int32",
+			payload: func() []byte {
+				payload := makeHeader(20)
+				binary.LittleEndian.PutUint32(payload[8:], 0)
+				binary.LittleEndian.PutUint32(payload[12:], 1)
+				binary.LittleEndian.PutUint32(payload[16:], 0x7FFFFFF0)
 
 				return payload
 			}(),
