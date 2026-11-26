@@ -451,10 +451,15 @@ func TestPeerConnection_Renegotiation_CodecChange(t *testing.T) {
 	require.Equal(t, "0", transceivers[0].Mid())
 
 	ctx, cancel := context.WithCancel(context.Background())
-	go sendVideoUntilDone(t, ctx.Done(), []*TrackLocalStaticSample{track1})
+	sendingDone := make(chan struct{})
+	go func() {
+		defer close(sendingDone)
+		sendVideoUntilDone(t, ctx.Done(), []*TrackLocalStaticSample{track1})
+	}()
 
 	remoteTrack1 := <-tracksCh
 	cancel()
+	<-sendingDone
 
 	assert.Equal(t, "video1", remoteTrack1.ID())
 	assert.Equal(t, "pion1", remoteTrack1.StreamID())
@@ -476,10 +481,15 @@ func TestPeerConnection_Renegotiation_CodecChange(t *testing.T) {
 	require.Equal(t, "0", transceivers[0].Mid())
 
 	ctx, cancel = context.WithCancel(context.Background())
-	go sendVideoUntilDone(t, ctx.Done(), []*TrackLocalStaticSample{track2})
+	sendingDone = make(chan struct{})
+	go func() {
+		defer close(sendingDone)
+		sendVideoUntilDone(t, ctx.Done(), []*TrackLocalStaticSample{track2})
+	}()
 
 	remoteTrack2 := <-tracksCh
 	cancel()
+	<-sendingDone
 
 	require.NoError(t, pcOffer.RemoveTrack(sender2))
 
@@ -1385,10 +1395,15 @@ func TestPeerConnection_Regegotiation_AnswerAddsTrack(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 
-	go sendVideoUntilDone(t, ctx.Done(), []*TrackLocalStaticSample{vp8Track})
+	sendingDone := make(chan struct{})
+	go func() {
+		defer close(sendingDone)
+		sendVideoUntilDone(t, ctx.Done(), []*TrackLocalStaticSample{vp8Track})
+	}()
 
 	<-tracksCh
 	cancel()
+	<-sendingDone
 
 	closePairNow(t, pcOffer, pcAnswer)
 }
