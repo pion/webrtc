@@ -11,6 +11,7 @@ import (
 	"io"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/pion/datachannel"
 	"github.com/pion/logging"
@@ -48,17 +49,15 @@ type DataChannel struct {
 	// binaryType                 string
 
 	onMessageHandler    func(DataChannelMessage)
-	openHandlerOnce     sync.Once
 	onOpenHandler       func()
-	dialHandlerOnce     sync.Once
 	onDialHandler       func()
-	closeHandlerOnce    sync.Once
 	onCloseHandler      func()
 	onBufferedAmountLow func()
 	onErrorHandler      func(error)
 
 	sctpTransport *SCTPTransport
 	dataChannel   *datachannel.DataChannel
+	writeDeadline time.Time
 
 	// A reference to the associated api object used by this datachannel
 	api *API
@@ -115,8 +114,7 @@ func (api *API) newDataChannel(
 
 // open opens the datachannel over the sctp transport.
 func (d *DataChannel) open(sctpTransport *SCTPTransport) error { //nolint:cyclop
-	association := sctpTransport.association()
-	if association == nil {
+	if sctpTransport.association() == nil {
 		return errSCTPNotEstablished
 	}
 
@@ -164,25 +162,30 @@ func (d *DataChannel) open(sctpTransport *SCTPTransport) error { //nolint:cyclop
 		LoggerFactory:        d.api.settingEngine.LoggerFactory,
 	}
 
-	if d.id == nil {
-		// avoid holding lock when generating ID, since id generation locks
-		d.mu.Unlock()
-		var dcID *uint16
-		err := d.sctpTransport.generateAndSetDataChannelID(d.sctpTransport.dtlsTransport.role(), &dcID)
-		if err != nil {
-			return err
-		}
-		d.mu.Lock()
-		d.id = dcID
+	id := d.id
+	d.mu.Unlock()
+
+	var dtlsRole DTLSRole
+	if id == nil {
+		dtlsRole = sctpTransport.dtlsTransport.role()
 	}
-	dc, err := datachannel.Dial(association, *d.id, cfg)
+	stream, err := sctpTransport.openDataChannelStream(d, id, dtlsRole)
 	if err != nil {
-		d.mu.Unlock()
+		d.setReadyState(DataChannelStateClosed)
 
 		return err
 	}
+	dc, err := datachannel.Client(stream, cfg)
+	if err != nil {
+		d.setReadyState(DataChannelStateClosed)
+
+		return errors.Join(err, stream.Close())
+	}
 
 	// bufferedAmountLowThreshold and onBufferedAmountLow might be set earlier
+	d.mu.Lock()
+	streamID := stream.StreamIdentifier()
+	d.id = &streamID
 	dc.SetBufferedAmountLowThreshold(d.bufferedAmountLowThreshold)
 	dc.OnBufferedAmountLow(d.onBufferedAmountLow)
 	d.mu.Unlock()
@@ -216,16 +219,18 @@ func (d *DataChannel) checkDetachAfterOpen() {
 // the underlying data transport has been established (or re-established).
 func (d *DataChannel) OnOpen(f func()) {
 	d.mu.Lock()
-	d.openHandlerOnce = sync.Once{}
-	d.onOpenHandler = f
-	d.mu.Unlock()
-
-	if d.ReadyState() == DataChannelStateOpen {
-		// If the data channel is already open, call the handler immediately.
-		go d.openHandlerOnce.Do(func() {
+	handler := f
+	if f != nil {
+		handler = sync.OnceFunc(func() {
 			f()
 			d.checkDetachAfterOpen()
 		})
+	}
+	d.onOpenHandler = handler
+	d.mu.Unlock()
+
+	if handler != nil && d.ReadyState() == DataChannelStateOpen {
+		go handler()
 	}
 }
 
@@ -240,10 +245,7 @@ func (d *DataChannel) onOpen() {
 	d.mu.RUnlock()
 
 	if handler != nil {
-		go d.openHandlerOnce.Do(func() {
-			handler()
-			d.checkDetachAfterOpen()
-		})
+		go handler()
 	}
 }
 
@@ -251,13 +253,14 @@ func (d *DataChannel) onOpen() {
 // peer has been dialed, but before said peer has responded.
 func (d *DataChannel) OnDial(f func()) {
 	d.mu.Lock()
-	d.dialHandlerOnce = sync.Once{}
+	if f != nil {
+		f = sync.OnceFunc(f)
+	}
 	d.onDialHandler = f
 	d.mu.Unlock()
 
-	if d.ReadyState() == DataChannelStateOpen {
-		// If the data channel is already open, call the handler immediately.
-		go d.dialHandlerOnce.Do(f)
+	if f != nil && d.ReadyState() == DataChannelStateOpen {
+		go f()
 	}
 }
 
@@ -272,7 +275,7 @@ func (d *DataChannel) onDial() {
 	d.mu.RUnlock()
 
 	if handler != nil {
-		go d.dialHandlerOnce.Do(handler)
+		go handler()
 	}
 }
 
@@ -284,13 +287,14 @@ func (d *DataChannel) onDial() {
 // prior to GracefulClose.
 func (d *DataChannel) OnClose(f func()) {
 	d.mu.Lock()
-	d.closeHandlerOnce = sync.Once{}
+	if f != nil {
+		f = sync.OnceFunc(f)
+	}
 	d.onCloseHandler = f
 	d.mu.Unlock()
 
-	if d.ReadyState() == DataChannelStateClosed {
-		// If the data channel is already closed, call the handler immediately.
-		go d.closeHandlerOnce.Do(f)
+	if f != nil && d.ReadyState() == DataChannelStateClosed {
+		go f()
 	}
 }
 
@@ -300,7 +304,7 @@ func (d *DataChannel) onClose() {
 	d.mu.RUnlock()
 
 	if handler != nil {
-		go d.closeHandlerOnce.Do(handler)
+		go handler()
 	}
 }
 
@@ -346,7 +350,11 @@ func (d *DataChannel) handleOpen(dc *datachannel.DataChannel, isRemote, isAlread
 	d.dataChannel = dc
 	bufferedAmountLowThreshold := d.bufferedAmountLowThreshold
 	onBufferedAmountLow := d.onBufferedAmountLow
+	writeDeadlineErr := dc.SetWriteDeadline(d.writeDeadline)
 	d.mu.Unlock()
+	if writeDeadlineErr != nil {
+		d.onError(writeDeadlineErr)
+	}
 	d.setReadyState(DataChannelStateOpen)
 
 	// Fire the OnOpen handler immediately not using pion/datachannel
@@ -408,36 +416,42 @@ func (d *DataChannel) readLoop() {
 		defer close(readLoopActive)
 	}()
 
-	buffer := make([]byte, sctpMaxMessageSizeUnsetValue)
+	maxMessageSize := int64(d.api.settingEngine.getSCTPMaxMessageSize())
+	buffer := make([]byte, min(sctpMaxMessageSizeUnsetValue, maxMessageSize))
 	for {
 		n, isString, err := d.dataChannel.ReadDataChannel(buffer)
-		if err != nil {
-			if errors.Is(err, io.ErrShortBuffer) {
-				if int64(n) < int64(d.api.settingEngine.getSCTPMaxMessageSize()) {
-					buffer = append(buffer, make([]byte, len(buffer))...) // nolint
+		if err == nil {
+			d.onMessage(DataChannelMessage{
+				Data:     append([]byte{}, buffer[:n]...),
+				IsString: isString,
+			})
 
-					continue
-				}
-
-				d.log.Errorf(
-					"Incoming DataChannel message larger then Max Message size %v",
-					d.api.settingEngine.getSCTPMaxMessageSize(),
-				)
-			}
-
-			d.setReadyState(DataChannelStateClosed)
-			if !errors.Is(err, io.EOF) {
-				d.onError(err)
-			}
-			d.onClose()
-
-			return
+			continue
 		}
 
-		d.onMessage(DataChannelMessage{
-			Data:     append([]byte{}, buffer[:n]...),
-			IsString: isString,
-		})
+		if errors.Is(err, io.ErrShortBuffer) {
+			// ReadDataChannel leaves a message queued when the buffer is too small.
+			if int64(len(buffer)) < maxMessageSize {
+				buffer = make([]byte, min(2*int64(len(buffer)), maxMessageSize))
+
+				continue
+			}
+
+			d.log.Errorf("Incoming DataChannel message larger than maximum message size %v", maxMessageSize)
+
+			// Reset the stream when the message exceeds the receive limit.
+			if closeErr := d.dataChannel.Close(); closeErr != nil {
+				d.log.Errorf("Failed to close DataChannel after oversized message %v", closeErr.Error())
+			}
+		}
+
+		d.setReadyState(DataChannelStateClosed)
+		if !errors.Is(err, io.EOF) {
+			d.onError(err)
+		}
+		d.onClose()
+
+		return
 	}
 }
 
@@ -463,6 +477,27 @@ func (d *DataChannel) SendText(s string) error {
 	_, err = d.dataChannel.WriteDataChannel([]byte(s), true)
 
 	return err
+}
+
+// SetWriteDeadline sets the deadline for pending and future Send and SendText calls.
+// It may be called before the data channel opens. A zero time value disables the
+// deadline. Deadlines are only enforced when
+// SettingEngine.EnableDataChannelBlockWrite(true) is configured.
+func (d *DataChannel) SetWriteDeadline(deadline time.Time) error {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+
+	d.writeDeadline = deadline
+
+	if d.dataChannel == nil {
+		if d.ReadyState() == DataChannelStateClosed {
+			return io.ErrClosedPipe
+		}
+
+		return nil
+	}
+
+	return d.dataChannel.SetWriteDeadline(deadline)
 }
 
 func (d *DataChannel) ensureOpen() error {
@@ -749,8 +784,7 @@ func (d *DataChannel) collectStats(collector *statsReportCollector) {
 		ID:        d.statsID,
 		Label:     d.label,
 		Protocol:  d.protocol,
-		// TransportID string `json:"transportId"`
-		State: d.ReadyState(),
+		State:     d.ReadyState(),
 	}
 
 	if d.id != nil {

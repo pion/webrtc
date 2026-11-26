@@ -7,9 +7,9 @@ package webrtc
 
 import (
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"io"
-	"math"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -20,7 +20,6 @@ import (
 	"github.com/pion/rtcp"
 	"github.com/pion/rtp"
 	"github.com/pion/srtp/v3"
-	"github.com/pion/webrtc/v5/internal/util"
 )
 
 // trackStreams maintains a mapping of RTP/RTCP streams to a specific track
@@ -52,7 +51,7 @@ type RTPReceiver struct {
 	received   chan any
 	mu         sync.RWMutex
 
-	tr *RTPTransceiver
+	tr atomic.Pointer[RTPTransceiver]
 
 	// A reference to the associated api object
 	api *API
@@ -80,9 +79,7 @@ func (api *API) NewRTPReceiver(kind RTPCodecType, transport *DTLSTransport) (*RT
 }
 
 func (r *RTPReceiver) setRTPTransceiver(tr *RTPTransceiver) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	r.tr = tr
+	r.tr.Store(tr)
 }
 
 // Transport returns the currently-configured *DTLSTransport or nil
@@ -94,13 +91,15 @@ func (r *RTPReceiver) Transport() *DTLSTransport {
 	return r.transport
 }
 
-func (r *RTPReceiver) getParameters() RTPParameters {
+func (r *RTPReceiver) getParameters(payloads *remoteRTPPayloadTypes) RTPParameters {
 	parameters := r.api.mediaEngine.getRTPParametersByKind(
 		r.kind,
 		[]RTPTransceiverDirection{RTPTransceiverDirectionRecvonly},
 	)
-	if r.tr != nil {
-		parameters.Codecs = r.tr.getCodecs()
+	if payloads != nil {
+		parameters.Codecs = payloads.codecs
+	} else if tr := r.tr.Load(); tr != nil {
+		parameters.Codecs = tr.getCodecs()
 	}
 
 	return parameters
@@ -112,7 +111,7 @@ func (r *RTPReceiver) GetParameters() RTPParameters {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
-	return r.getParameters()
+	return r.getParameters(nil)
 }
 
 // Track returns the RtpTransceiver TrackRemote.
@@ -144,10 +143,15 @@ func (r *RTPReceiver) Tracks() []*TrackRemote {
 // RTPTransceiver returns the RTPTransceiver this
 // RTPReceiver belongs too, or nil if none.
 func (r *RTPReceiver) RTPTransceiver() *RTPTransceiver {
-	r.mu.Lock()
-	defer r.mu.Unlock()
+	return r.tr.Load()
+}
 
-	return r.tr
+func (r *RTPReceiver) remotePayloadTypes() *remoteRTPPayloadTypes {
+	if tr := r.tr.Load(); tr != nil {
+		return tr.remotePayloadTypes.Load()
+	}
+
+	return nil
 }
 
 // configureReceive initialize the track.
@@ -180,7 +184,11 @@ func (r *RTPReceiver) startReceive(parameters RTPReceiveParameters) error { //no
 	default:
 	}
 
-	globalParams := r.getParameters()
+	if r.haveClosed() {
+		return io.EOF
+	}
+
+	globalParams := r.getParameters(nil)
 	codec := RTPCodecCapability{}
 	if len(globalParams.Codecs) != 0 {
 		codec = globalParams.Codecs[0].RTPCodecCapability
@@ -212,7 +220,7 @@ func (r *RTPReceiver) startReceive(parameters RTPReceiveParameters) error { //no
 			globalParams.HeaderExtensions,
 		)
 
-		result, err := r.transport.streamsForSSRC(parameters.Encodings[i].SSRC, *streams.streamInfo)
+		result, err := r.transport.streamsForSSRC(parameters.Encodings[i].SSRC, streams.streamInfo)
 		if err != nil {
 			return err
 		}
@@ -228,10 +236,7 @@ func (r *RTPReceiver) startReceive(parameters RTPReceiveParameters) error { //no
 			rtxCodec.RTCPFeedback = nil
 			rtxCodec.MimeType = MimeTypeRTX
 			streamInfo := createStreamInfo("", rtxSsrc, 0, 0, 0, 0, 0, rtxCodec, globalParams.HeaderExtensions)
-			result, err = r.transport.streamsForSSRC(
-				rtxSsrc,
-				*streamInfo,
-			)
+			result, err = r.transport.streamsForSSRC(rtxSsrc, streamInfo)
 			if err != nil {
 				return err
 			}
@@ -258,11 +263,20 @@ func (r *RTPReceiver) Receive(parameters RTPReceiveParameters) error {
 func (r *RTPReceiver) Read(b []byte) (n int, a interceptor.Attributes, err error) {
 	select {
 	case <-r.received:
-		if len(r.tracks) > 1 {
+		r.mu.RLock()
+		if len(r.tracks) == 0 || r.tracks[0].track == nil {
+			r.mu.RUnlock()
+
+			return 0, nil, errRTPReceiverForRIDTrackStreamNotFound
+		}
+		rid := r.tracks[0].track.RID()
+		isSimulcast := len(r.tracks) > 1
+		r.mu.RUnlock()
+		if isSimulcast {
 			r.log.Errorf(useReadSimulcast)
 		}
 
-		return r.ReadSimulcast(b, r.tracks[0].track.RID())
+		return r.ReadSimulcast(b, rid)
 	case <-r.closedChan:
 		return 0, nil, io.ErrClosedPipe
 	}
@@ -278,14 +292,47 @@ func (r *RTPReceiver) ReadSimulcast(b []byte, rid string) (n int, a interceptor.
 					return 0, nil, err
 				}
 				r.mu.RLock()
-				reader := r.streamsForTrack(track).rtcpInterceptor
+				var reader interceptor.RTCPReader
+				if streams := r.streamsForTrack(track); streams != nil {
+					reader = streams.rtcpInterceptor
+				}
 				r.mu.RUnlock()
+				if reader == nil {
+					break
+				}
 
 				return reader.Read(b, a)
 			}
 		}
 
 		return 0, nil, fmt.Errorf("%w: %s", errRTPReceiverForRIDTrackStreamNotFound, rid)
+
+	case <-r.closedChan:
+		return 0, nil, io.ErrClosedPipe
+	}
+}
+
+// ReadSimulcastSSRC reads incoming RTCP for this RTPReceiver for given SSRC.
+func (r *RTPReceiver) ReadSimulcastSSRC(b []byte, ssrc SSRC) (n int, a interceptor.Attributes, err error) {
+	select {
+	case <-r.received:
+		var rtcpInterceptor interceptor.RTCPReader
+
+		r.mu.Lock()
+		for _, t := range r.tracks {
+			if t.track != nil && t.track.ssrc == ssrc {
+				rtcpInterceptor = t.rtcpInterceptor
+
+				break
+			}
+		}
+		r.mu.Unlock()
+
+		if rtcpInterceptor == nil {
+			return 0, nil, fmt.Errorf("%w: %d", errRTPReceiverForSSRCTrackStreamNotFound, ssrc)
+		}
+
+		return rtcpInterceptor.Read(b, a)
 
 	case <-r.closedChan:
 		return 0, nil, io.ErrClosedPipe
@@ -306,24 +353,22 @@ func readRTCP(read func([]byte) (int, interceptor.Attributes, error), mtu uint) 
 	}
 
 	pkts, err := rtcp.Unmarshal(b[:i])
-	if err != nil {
-		return nil, nil, err
-	}
 
-	return pkts, attributes, nil
+	return pkts, attributes, err
 }
 
 // ReadSimulcastRTCP is a convenience method that wraps ReadSimulcast and unmarshal for you.
 func (r *RTPReceiver) ReadSimulcastRTCP(rid string) ([]rtcp.Packet, interceptor.Attributes, error) {
-	b := make([]byte, r.api.settingEngine.getReceiveMTU())
-	i, attributes, err := r.ReadSimulcast(b, rid)
-	if err != nil {
-		return nil, nil, err
-	}
+	return readRTCP(func(b []byte) (int, interceptor.Attributes, error) {
+		return r.ReadSimulcast(b, rid)
+	}, r.api.settingEngine.getReceiveMTU())
+}
 
-	pkts, err := rtcp.Unmarshal(b[:i])
-
-	return pkts, attributes, err
+// ReadSimulcastSSRCRTCP is a convenience method that wraps ReadSimulcastSSRC and unmarshal for you.
+func (r *RTPReceiver) ReadSimulcastSSRCRTCP(ssrc SSRC) ([]rtcp.Packet, interceptor.Attributes, error) {
+	return readRTCP(func(b []byte) (int, interceptor.Attributes, error) {
+		return r.ReadSimulcastSSRC(b, ssrc)
+	}, r.api.settingEngine.getReceiveMTU())
 }
 
 func (r *RTPReceiver) haveReceived() bool {
@@ -343,29 +388,29 @@ func (r *RTPReceiver) haveClosed() bool {
 func (r *RTPReceiver) Stop() error { //nolint:cyclop
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	var err error
+	var errs []error
 
 	select {
 	case <-r.closedChan:
-		return err
+		return nil
 	default:
 	}
 
 	select {
 	case <-r.received:
 		for i := range r.tracks {
-			errs := []error{}
-
 			if r.tracks[i].rtcpReadStream != nil {
 				errs = append(errs, r.tracks[i].rtcpReadStream.Close())
 			}
 
 			if r.tracks[i].rtpReader != nil {
 				errs = append(errs, r.tracks[i].rtpReader.readStream.Close())
+				r.transport.removeSimulcastStream(r.tracks[i].rtpReader.readStream)
 			}
 
 			if r.tracks[i].repairReader != nil {
 				errs = append(errs, r.tracks[i].repairReader.readStream.Close())
+				r.transport.removeSimulcastStream(r.tracks[i].repairReader.readStream)
 			}
 
 			if r.tracks[i].repairRtcpReadStream != nil {
@@ -379,8 +424,6 @@ func (r *RTPReceiver) Stop() error { //nolint:cyclop
 			if r.tracks[i].repairStreamInfo != nil {
 				r.api.interceptor.UnbindRemoteStream(r.tracks[i].repairStreamInfo)
 			}
-
-			err = util.FlattenErrs(errs)
 		}
 	default:
 	}
@@ -395,7 +438,7 @@ func (r *RTPReceiver) Stop() error { //nolint:cyclop
 		}
 	}
 
-	return err
+	return errors.Join(errs...)
 }
 
 func (r *RTPReceiver) collectStats(collector *statsReportCollector, statsGetter stats.Getter) {
@@ -408,8 +451,8 @@ func (r *RTPReceiver) collectStats(collector *statsReportCollector, statsGetter 
 
 	// Emit inbound-rtp stats for each track
 	mid := ""
-	if r.tr != nil {
-		mid = r.tr.Mid()
+	if tr := r.tr.Load(); tr != nil {
+		mid = tr.Mid()
 	}
 	now := statsTimestampNow()
 	nowTime := now.Time()
@@ -422,10 +465,7 @@ func (r *RTPReceiver) collectStats(collector *statsReportCollector, statsGetter 
 		collector.Collecting()
 
 		inboundID := fmt.Sprintf("inbound-rtp-%d", uint32(remoteTrack.SSRC()))
-		codecID := ""
-		if remoteTrack.codec.statsID != "" {
-			codecID = remoteTrack.codec.statsID
-		}
+		codecID := remoteTrack.Codec().statsID
 
 		inboundStats := InboundRTPStreamStats{
 			Rid:             remoteTrack.RID(),
@@ -436,7 +476,7 @@ func (r *RTPReceiver) collectStats(collector *statsReportCollector, statsGetter 
 			SSRC:            remoteTrack.SSRC(),
 			Kind:            r.kind.String(),
 			TrackIdentifier: remoteTrack.ID(),
-			TransportID:     "iceTransport",
+			TransportID:     r.transport.statsID,
 			CodecID:         codecID,
 		}
 		r.populateInboundStats(&inboundStats, statsGetter, remoteTrack)
@@ -459,19 +499,8 @@ func (r *RTPReceiver) populateInboundStats(
 		return
 	}
 
-	// Wrap-around casting by design, with warnings if overflow/underflow is detected.
-	pr := stats.InboundRTPStreamStats.PacketsReceived
-	if pr > math.MaxUint32 {
-		r.log.Warnf("Inbound PacketsReceived exceeds uint32 and will wrap: %d", pr)
-	}
-	inboundStats.PacketsReceived = uint32(pr) //nolint:gosec
-
-	pl := stats.InboundRTPStreamStats.PacketsLost
-	if pl > math.MaxInt32 || pl < math.MinInt32 {
-		r.log.Warnf("Inbound PacketsLost exceeds int32 range and will wrap: %d", pl)
-	}
-	inboundStats.PacketsLost = int32(pl) //nolint:gosec
-
+	inboundStats.PacketsReceived = stats.InboundRTPStreamStats.PacketsReceived
+	inboundStats.PacketsLost = stats.InboundRTPStreamStats.PacketsLost
 	inboundStats.Jitter = stats.InboundRTPStreamStats.Jitter
 	inboundStats.BytesReceived = stats.InboundRTPStreamStats.BytesReceived
 	inboundStats.HeaderBytesReceived = stats.InboundRTPStreamStats.HeaderBytesReceived
@@ -632,6 +661,7 @@ func (r *RTPReceiver) receiveForRtx(
 	return r.receiveForRtxInternal(ssrc, rsid, streamInfo, streams)
 }
 
+//nolint:cyclop,nestif
 func (r *RTPReceiver) receiveForRtxInternal(
 	ssrc SSRC,
 	rsid string,
@@ -647,11 +677,15 @@ func (r *RTPReceiver) receiveForRtxInternal(
 		track = &r.tracks[0]
 	} else {
 		for i := range r.tracks {
-			if r.tracks[i].track.RID() == rsid {
+			if rsid != "" && r.tracks[i].track.RID() == rsid {
 				track = &r.tracks[i]
 				if track.track.RtxSSRC() == 0 {
 					track.track.setRtxSSRC(SSRC(streamInfo.SSRC))
 				}
+
+				break
+			} else if rsid == "" && r.tracks[i].track.RtxSSRC() == ssrc {
+				track = &r.tracks[i]
 
 				break
 			}
@@ -659,6 +693,10 @@ func (r *RTPReceiver) receiveForRtxInternal(
 	}
 
 	if track == nil {
+		if rsid == "" {
+			return fmt.Errorf("%w: %d", errRTPReceiverForSSRCTrackStreamNotFound, ssrc)
+		}
+
 		return fmt.Errorf("%w: ssrc(%d) rsid(%s)", errRTPReceiverForRIDTrackStreamNotFound, ssrc, rsid)
 	}
 
@@ -679,9 +717,27 @@ func (t *trackStreams) setRTX() error {
 	return t.rtpReader.readStream.SetRTX(t.repairReader.readStream.GetSSRC())
 }
 
+func (r *RTPReceiver) ownsStream(info *interceptor.StreamInfo) bool {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	for _, track := range r.tracks {
+		if track.streamInfo == info || track.repairStreamInfo == info {
+			return true
+		}
+	}
+
+	return false
+}
+
 // SetReadDeadline sets the max amount of time the RTCP stream will block before returning. 0 is forever.
 func (r *RTPReceiver) SetReadDeadline(t time.Time) error {
 	r.mu.RLock()
+	if len(r.tracks) == 0 || r.tracks[0].track == nil {
+		r.mu.RUnlock()
+
+		return errRTPReceiverForRIDTrackStreamNotFound
+	}
 	rid := r.tracks[0].track.RID()
 	r.mu.RUnlock()
 
@@ -703,11 +759,28 @@ func (r *RTPReceiver) SetReadDeadlineSimulcast(deadline time.Time, rid string) e
 				}
 			}
 
-			return t.rtcpReadStream.SetReadDeadline(deadline)
+			if t.rtcpReadStream != nil {
+				return t.rtcpReadStream.SetReadDeadline(deadline)
+			}
 		}
 	}
 
 	return fmt.Errorf("%w: %s", errRTPReceiverForRIDTrackStreamNotFound, rid)
+}
+
+// SetReadDeadlineSimulcastSSRC sets the max amount of time the RTCP stream for a given SSRC will block before
+// returning. 0 is forever.
+func (r *RTPReceiver) SetReadDeadlineSimulcastSSRC(deadline time.Time, ssrc SSRC) error {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	for _, t := range r.tracks {
+		if t.track != nil && t.track.ssrc == ssrc && t.rtcpReadStream != nil {
+			return t.rtcpReadStream.SetReadDeadline(deadline)
+		}
+	}
+
+	return fmt.Errorf("%w: %d", errRTPReceiverForSSRCTrackStreamNotFound, ssrc)
 }
 
 // setRTPReadDeadline sets the max amount of time the RTP stream will block before returning. 0 is forever.
@@ -724,7 +797,9 @@ func (r *RTPReceiver) setRTPReadDeadline(deadline time.Time, reader *TrackRemote
 			}
 		}
 
-		return t.rtpReader.readStream.SetReadDeadline(deadline)
+		if t.rtpReader != nil {
+			return t.rtpReader.readStream.SetReadDeadline(deadline)
+		}
 	}
 
 	return fmt.Errorf("%w: %d", errRTPReceiverWithSSRCTrackStreamNotFound, reader.SSRC())

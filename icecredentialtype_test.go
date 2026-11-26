@@ -22,10 +22,7 @@ func TestNewICECredentialType(t *testing.T) {
 	for i, testCase := range testCases {
 		tpe, err := newICECredentialType(testCase.credentialTypeString)
 		assert.NoError(t, err)
-		assert.Equal(t,
-			testCase.expectedCredentialType, tpe,
-			"testCase: %d %v", i, testCase,
-		)
+		assert.Equal(t, testCase.expectedCredentialType, tpe, "testCase: %d %v", i, testCase)
 	}
 }
 
@@ -39,11 +36,7 @@ func TestICECredentialType_String(t *testing.T) {
 	}
 
 	for i, testCase := range testCases {
-		assert.Equal(t,
-			testCase.expectedString,
-			testCase.credentialType.String(),
-			"testCase: %d %v", i, testCase,
-		)
+		assert.Equal(t, testCase.expectedString, testCase.credentialType.String(), "testCase: %d %v", i, testCase)
 	}
 }
 
@@ -59,10 +52,7 @@ func TestICECredentialType_new(t *testing.T) {
 	for i, testCase := range testCases {
 		tpe, err := newICECredentialType(testCase.expectedString)
 		assert.NoError(t, err)
-		assert.Equal(t,
-			tpe, testCase.credentialType,
-			"testCase: %d %v", i, testCase,
-		)
+		assert.Equal(t, tpe, testCase.credentialType, "testCase: %d %v", i, testCase)
 	}
 }
 
@@ -78,19 +68,11 @@ func TestICECredentialType_Json(t *testing.T) {
 	for i, testCase := range testCases {
 		m, err := json.Marshal(testCase.credentialType)
 		assert.NoError(t, err)
-		assert.Equal(t,
-			testCase.jsonRepresentation,
-			m,
-			"Marshal testCase: %d %v", i, testCase,
-		)
+		assert.Equal(t, testCase.jsonRepresentation, m, "Marshal testCase: %d %v", i, testCase)
 		var ct ICECredentialType
 		err = json.Unmarshal(testCase.jsonRepresentation, &ct)
 		assert.NoError(t, err)
-		assert.Equal(t,
-			testCase.credentialType,
-			ct,
-			"Unmarshal testCase: %d %v", i, testCase,
-		)
+		assert.Equal(t, testCase.credentialType, ct, "Unmarshal testCase: %d %v", i, testCase)
 	}
 
 	{

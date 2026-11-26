@@ -49,14 +49,6 @@ func UnmarshalStatsJSON(b []byte) (Stats, error) { //nolint:cyclop
 		return unmarshalPeerConnectionStats(b)
 	case StatsTypeDataChannel:
 		return unmarshalDataChannelStats(b)
-	case StatsTypeStream:
-		return unmarshalStreamStats(b)
-	case StatsTypeTrack:
-		return unmarshalTrackStats(b)
-	case StatsTypeSender:
-		return unmarshalSenderStats(b)
-	case StatsTypeReceiver:
-		return unmarshalReceiverStats(b)
 	case StatsTypeTransport:
 		return unmarshalTransportStats(b)
 	case StatsTypeCandidatePair:
@@ -102,18 +94,6 @@ const (
 
 	// StatsTypeDataChannel is used by DataChannelStats.
 	StatsTypeDataChannel StatsType = "data-channel"
-
-	// StatsTypeStream is used by MediaStreamStats.
-	StatsTypeStream StatsType = "stream"
-
-	// StatsTypeTrack is used by SenderVideoTrackAttachmentStats and SenderAudioTrackAttachmentStats depending on kind.
-	StatsTypeTrack StatsType = "track"
-
-	// StatsTypeSender is used by the AudioSenderStats or VideoSenderStats depending on kind.
-	StatsTypeSender StatsType = "sender"
-
-	// StatsTypeReceiver is used by the AudioReceiverStats or VideoReceiverStats depending on kind.
-	StatsTypeReceiver StatsType = "receiver"
 
 	// StatsTypeTransport is used by TransportStats.
 	StatsTypeTransport StatsType = "transport"
@@ -432,11 +412,11 @@ type InboundRTPStreamStats struct {
 	TotalSquaredInterFrameDelay float64 `json:"totalSquaredInterFrameDelay"`
 
 	// PacketsReceived is the total number of RTP packets received for this SSRC.
-	PacketsReceived uint32 `json:"packetsReceived"`
+	PacketsReceived uint64 `json:"packetsReceived"`
 
 	// PacketsLost is the total number of RTP packets lost for this SSRC. Note that
 	// because of how this is estimated, it can be negative if more packets are received than sent.
-	PacketsLost int32 `json:"packetsLost"`
+	PacketsLost int64 `json:"packetsLost"`
 
 	// Jitter is the packet jitter measured in seconds for this SSRC
 	Jitter float64 `json:"jitter"`
@@ -444,14 +424,10 @@ type InboundRTPStreamStats struct {
 	// PacketsDiscarded is the cumulative number of RTP packets discarded by the jitter
 	// buffer due to late or early-arrival, i.e., these packets are not played out.
 	// RTP packets discarded due to packet duplication are not reported in this metric.
-	PacketsDiscarded uint32 `json:"packetsDiscarded"`
+	PacketsDiscarded uint64 `json:"packetsDiscarded"`
 
 	// TrackIdentifier is the id of the MediaStreamTrack receiving this stream.
 	TrackIdentifier string `json:"trackIdentifier"`
-
-	// ReceiverID is the stats ID used to look up the AudioReceiverStats or VideoReceiverStats
-	// object receiving this stream.
-	ReceiverID string `json:"receiverId"`
 
 	// RemoteID is used for looking up the remote RemoteOutboundRTPStreamStats object
 	// for the same SSRC.
@@ -498,7 +474,7 @@ type InboundRTPStreamStats struct {
 
 	// FECPacketsReceived is the total number of RTP FEC packets received for this SSRC.
 	// This counter can also be incremented when receiving FEC packets in-band with media packets (e.g., with Opus).
-	FECPacketsReceived uint32 `json:"fecPacketsReceived"`
+	FECPacketsReceived uint64 `json:"fecPacketsReceived"`
 
 	// FECPacketsDiscarded is the total number of RTP FEC packets received for this SSRC where the
 	// error correction payload was discarded by the application. This may happen
@@ -604,9 +580,9 @@ type OutboundRTPStreamStats struct {
 	// Must not exist for audio.
 	Rid string `json:"rid"`
 
-	// MediaSourceID is the identifier of the stats object representing the track currently
-	// attached to the sender of this stream, an RTCMediaSourceStats.
-	MediaSourceID string `json:"mediaSourceId"`
+	// nolint:godox
+	// TODO: add media-source stats.
+	// MediaSourceID string `json:"mediaSourceId"`
 
 	// Timestamp is the timestamp associated with this object.
 	Timestamp StatsTimestamp `json:"timestamp"`
@@ -668,19 +644,10 @@ type OutboundRTPStreamStats struct {
 	QPSum uint64 `json:"qpSum"`
 
 	// PacketsSent is the total number of RTP packets sent for this SSRC.
-	PacketsSent uint32 `json:"packetsSent"`
+	PacketsSent uint64 `json:"packetsSent"`
 
 	// BytesSent is the total number of bytes sent for this SSRC.
 	BytesSent uint64 `json:"bytesSent"`
-
-	// TrackID is the identifier of the stats object representing the current track
-	// attachment to the sender of this stream, a SenderAudioTrackAttachmentStats
-	// or SenderVideoTrackAttachmentStats.
-	TrackID string `json:"trackId"`
-
-	// SenderID is the stats ID used to look up the AudioSenderStats or VideoSenderStats
-	// object sending this stream.
-	SenderID string `json:"senderId"`
 
 	// RemoteID is used for looking up the remote RemoteInboundRTPStreamStats object
 	// for the same SSRC.
@@ -855,11 +822,11 @@ type RemoteInboundRTPStreamStats struct {
 	QPSum uint64 `json:"qpSum"`
 
 	// PacketsReceived is the total number of RTP packets received for this SSRC.
-	PacketsReceived uint32 `json:"packetsReceived"`
+	PacketsReceived uint64 `json:"packetsReceived"`
 
 	// PacketsLost is the total number of RTP packets lost for this SSRC. Note that
 	// because of how this is estimated, it can be negative if more packets are received than sent.
-	PacketsLost int32 `json:"packetsLost"`
+	PacketsLost int64 `json:"packetsLost"`
 
 	// Jitter is the packet jitter measured in seconds for this SSRC
 	Jitter float64 `json:"jitter"`
@@ -952,7 +919,7 @@ type RemoteOutboundRTPStreamStats struct {
 	QPSum uint64 `json:"qpSum"`
 
 	// PacketsSent is the total number of RTP packets sent for this SSRC.
-	PacketsSent uint32 `json:"packetsSent"`
+	PacketsSent uint64 `json:"packetsSent"`
 
 	// BytesSent is the total number of bytes sent for this SSRC.
 	BytesSent uint64 `json:"bytesSent"`
@@ -1269,9 +1236,6 @@ type DataChannelStats struct {
 	// DataChannelIdentifier is the "id" attribute of the DataChannel object.
 	DataChannelIdentifier int32 `json:"dataChannelIdentifier"`
 
-	// TransportID the ID of the TransportStats object for transport used to carry this datachannel.
-	TransportID string `json:"transportId"`
-
 	// State is the "readyState" value of the DataChannel object.
 	State DataChannelState `json:"state"`
 
@@ -1302,473 +1266,7 @@ func unmarshalDataChannelStats(b []byte) (DataChannelStats, error) {
 	return dataChannelStats, nil
 }
 
-// MediaStreamStats contains statistics related to a specific MediaStream.
-type MediaStreamStats struct {
-	// Timestamp is the timestamp associated with this object.
-	Timestamp StatsTimestamp `json:"timestamp"`
-
-	// Type is the object's StatsType
-	Type StatsType `json:"type"`
-
-	// ID is a unique id that is associated with the component inspected to produce
-	// this Stats object. Two Stats objects will have the same ID if they were produced
-	// by inspecting the same underlying object.
-	ID string `json:"id"`
-
-	// StreamIdentifier is the "id" property of the MediaStream
-	StreamIdentifier string `json:"streamIdentifier"`
-
-	// TrackIDs is a list of the identifiers of the stats object representing the
-	// stream's tracks, either ReceiverAudioTrackAttachmentStats or ReceiverVideoTrackAttachmentStats.
-	TrackIDs []string `json:"trackIds"`
-}
-
-func (s MediaStreamStats) statsMarker() {}
-
-func unmarshalStreamStats(b []byte) (MediaStreamStats, error) {
-	var streamStats MediaStreamStats
-	err := json.Unmarshal(b, &streamStats)
-	if err != nil {
-		return MediaStreamStats{}, fmt.Errorf("unmarshal stream stats: %w", err)
-	}
-
-	return streamStats, nil
-}
-
-// AudioSenderStats represents the stats about one audio sender of a PeerConnection
-// object for which one calls GetStats.
-//
-// It appears in the stats as soon as the RTPSender is added by either AddTrack
-// or AddTransceiver, or by media negotiation.
-type AudioSenderStats struct {
-	// Timestamp is the timestamp associated with this object.
-	Timestamp StatsTimestamp `json:"timestamp"`
-
-	// Type is the object's StatsType
-	Type StatsType `json:"type"`
-
-	// ID is a unique id that is associated with the component inspected to produce
-	// this Stats object. Two Stats objects will have the same ID if they were produced
-	// by inspecting the same underlying object.
-	ID string `json:"id"`
-
-	// TrackIdentifier represents the id property of the track.
-	TrackIdentifier string `json:"trackIdentifier"`
-
-	// RemoteSource is true if the source is remote, for instance if it is sourced
-	// from another host via a PeerConnection. False otherwise. Only applicable for 'track' stats.
-	RemoteSource bool `json:"remoteSource"`
-
-	// Ended reflects the "ended" state of the track.
-	Ended bool `json:"ended"`
-
-	// Kind is "audio"
-	Kind string `json:"kind"`
-
-	// AudioLevel represents the output audio level of the track.
-	//
-	// The value is a value between 0..1 (linear), where 1.0 represents 0 dBov,
-	// 0 represents silence, and 0.5 represents approximately 6 dBSPL change in
-	// the sound pressure level from 0 dBov.
-	//
-	// If the track is sourced from an Receiver, does no audio processing, has a
-	// constant level, and has a volume setting of 1.0, the audio level is expected
-	// to be the same as the audio level of the source SSRC, while if the volume setting
-	// is 0.5, the AudioLevel is expected to be half that value.
-	//
-	// For outgoing audio tracks, the AudioLevel is the level of the audio being sent.
-	AudioLevel float64 `json:"audioLevel"`
-
-	// TotalAudioEnergy is the total energy of all the audio samples sent/received
-	// for this object, calculated by duration * Math.pow(energy/maxEnergy, 2) for
-	// each audio sample seen.
-	TotalAudioEnergy float64 `json:"totalAudioEnergy"`
-
-	// VoiceActivityFlag represents whether the last RTP packet sent or played out
-	// by this track contained voice activity or not based on the presence of the
-	// V bit in the extension header, as defined in [RFC6464].
-	//
-	// This value indicates the voice activity in the latest RTP packet played out
-	// from a given SSRC, and is defined in RTPSynchronizationSource.voiceActivityFlag.
-	VoiceActivityFlag bool `json:"voiceActivityFlag"`
-
-	// TotalSamplesDuration represents the total duration in seconds of all samples
-	// that have sent or received (and thus counted by TotalSamplesSent or TotalSamplesReceived).
-	// Can be used with TotalAudioEnergy to compute an average audio level over different intervals.
-	TotalSamplesDuration float64 `json:"totalSamplesDuration"`
-
-	// EchoReturnLoss is only present while the sender is sending a track sourced from
-	// a microphone where echo cancellation is applied. Calculated in decibels.
-	EchoReturnLoss float64 `json:"echoReturnLoss"`
-
-	// EchoReturnLossEnhancement is only present while the sender is sending a track
-	// sourced from a microphone where echo cancellation is applied. Calculated in decibels.
-	EchoReturnLossEnhancement float64 `json:"echoReturnLossEnhancement"`
-
-	// TotalSamplesSent is the total number of samples that have been sent by this sender.
-	TotalSamplesSent uint64 `json:"totalSamplesSent"`
-}
-
-func (s AudioSenderStats) statsMarker() {}
-
-// SenderAudioTrackAttachmentStats object represents the stats about one attachment
-// of an audio MediaStreamTrack to the PeerConnection object for which one calls GetStats.
-//
-// It appears in the stats as soon as it is attached (via AddTrack, via AddTransceiver,
-// via ReplaceTrack on an RTPSender object).
-//
-// If an audio track is attached twice (via AddTransceiver or ReplaceTrack), there
-// will be two SenderAudioTrackAttachmentStats objects, one for each attachment.
-// They will have the same "TrackIdentifier" attribute, but different "ID" attributes.
-//
-// If the track is detached from the PeerConnection (via removeTrack or via replaceTrack),
-// it continues to appear, but with the "ObjectDeleted" member set to true.
-type SenderAudioTrackAttachmentStats AudioSenderStats
-
-func (s SenderAudioTrackAttachmentStats) statsMarker() {}
-
-// VideoSenderStats represents the stats about one video sender of a PeerConnection
-// object for which one calls GetStats.
-//
-// It appears in the stats as soon as the sender is added by either AddTrack or
-// AddTransceiver, or by media negotiation.
-type VideoSenderStats struct {
-	// Timestamp is the timestamp associated with this object.
-	Timestamp StatsTimestamp `json:"timestamp"`
-
-	// Type is the object's StatsType
-	Type StatsType `json:"type"`
-
-	// ID is a unique id that is associated with the component inspected to produce
-	// this Stats object. Two Stats objects will have the same ID if they were produced
-	// by inspecting the same underlying object.
-	ID string `json:"id"`
-
-	// Kind is "video"
-	Kind string `json:"kind"`
-
-	// FramesCaptured represents the total number of frames captured, before encoding,
-	// for this RTPSender (or for this MediaStreamTrack, if type is "track"). For example,
-	// if type is "sender" and this sender's track represents a camera, then this is the
-	// number of frames produced by the camera for this track while being sent by this sender,
-	// combined with the number of frames produced by all tracks previously attached to this
-	// sender while being sent by this sender. Framerates can vary due to hardware limitations
-	// or environmental factors such as lighting conditions.
-	FramesCaptured uint32 `json:"framesCaptured"`
-
-	// FramesSent represents the total number of frames sent by this RTPSender
-	// (or for this MediaStreamTrack, if type is "track").
-	FramesSent uint32 `json:"framesSent"`
-
-	// HugeFramesSent represents the total number of huge frames sent by this RTPSender
-	// (or for this MediaStreamTrack, if type is "track"). Huge frames, by definition,
-	// are frames that have an encoded size at least 2.5 times the average size of the frames.
-	// The average size of the frames is defined as the target bitrate per second divided
-	// by the target fps at the time the frame was encoded. These are usually complex
-	// to encode frames with a lot of changes in the picture. This can be used to estimate,
-	// e.g slide changes in the streamed presentation. If a huge frame is also a key frame,
-	// then both counters HugeFramesSent and KeyFramesSent are incremented.
-	HugeFramesSent uint32 `json:"hugeFramesSent"`
-
-	// KeyFramesSent represents the total number of key frames sent by this RTPSender
-	// (or for this MediaStreamTrack, if type is "track"), such as Infra-frames in
-	// VP8 [RFC6386] or I-frames in H.264 [RFC6184]. This is a subset of FramesSent.
-	// FramesSent - KeyFramesSent gives you the number of delta frames sent.
-	KeyFramesSent uint32 `json:"keyFramesSent"`
-}
-
-func (s VideoSenderStats) statsMarker() {}
-
-// SenderVideoTrackAttachmentStats represents the stats about one attachment of a
-// video MediaStreamTrack to the PeerConnection object for which one calls GetStats.
-//
-// It appears in the stats as soon as it is attached (via AddTrack, via AddTransceiver,
-// via ReplaceTrack on an RTPSender object).
-//
-// If a video track is attached twice (via AddTransceiver or ReplaceTrack), there
-// will be two SenderVideoTrackAttachmentStats objects, one for each attachment.
-// They will have the same "TrackIdentifier" attribute, but different "ID" attributes.
-//
-// If the track is detached from the PeerConnection (via RemoveTrack or via ReplaceTrack),
-// it continues to appear, but with the "ObjectDeleted" member set to true.
-type SenderVideoTrackAttachmentStats VideoSenderStats
-
-func (s SenderVideoTrackAttachmentStats) statsMarker() {}
-
-func unmarshalSenderStats(b []byte) (Stats, error) {
-	type kindJSON struct {
-		Kind string `json:"kind"`
-	}
-	kindHolder := kindJSON{}
-
-	err := json.Unmarshal(b, &kindHolder)
-	if err != nil {
-		return nil, fmt.Errorf("unmarshal json kind: %w", err)
-	}
-
-	switch MediaKind(kindHolder.Kind) {
-	case MediaKindAudio:
-		var senderStats AudioSenderStats
-		err := json.Unmarshal(b, &senderStats)
-		if err != nil {
-			return nil, fmt.Errorf("unmarshal audio sender stats: %w", err)
-		}
-
-		return senderStats, nil
-	case MediaKindVideo:
-		var senderStats VideoSenderStats
-		err := json.Unmarshal(b, &senderStats)
-		if err != nil {
-			return nil, fmt.Errorf("unmarshal video sender stats: %w", err)
-		}
-
-		return senderStats, nil
-	default:
-		return nil, fmt.Errorf("kind: %w", ErrUnknownType)
-	}
-}
-
-func unmarshalTrackStats(b []byte) (Stats, error) {
-	type kindJSON struct {
-		Kind string `json:"kind"`
-	}
-	kindHolder := kindJSON{}
-
-	err := json.Unmarshal(b, &kindHolder)
-	if err != nil {
-		return nil, fmt.Errorf("unmarshal json kind: %w", err)
-	}
-
-	switch MediaKind(kindHolder.Kind) {
-	case MediaKindAudio:
-		var trackStats SenderAudioTrackAttachmentStats
-		err := json.Unmarshal(b, &trackStats)
-		if err != nil {
-			return nil, fmt.Errorf("unmarshal audio track stats: %w", err)
-		}
-
-		return trackStats, nil
-	case MediaKindVideo:
-		var trackStats SenderVideoTrackAttachmentStats
-		err := json.Unmarshal(b, &trackStats)
-		if err != nil {
-			return nil, fmt.Errorf("unmarshal video track stats: %w", err)
-		}
-
-		return trackStats, nil
-	default:
-		return nil, fmt.Errorf("kind: %w", ErrUnknownType)
-	}
-}
-
-// AudioReceiverStats contains audio metrics related to a specific receiver.
-type AudioReceiverStats struct {
-	// Timestamp is the timestamp associated with this object.
-	Timestamp StatsTimestamp `json:"timestamp"`
-
-	// Type is the object's StatsType
-	Type StatsType `json:"type"`
-
-	// ID is a unique id that is associated with the component inspected to produce
-	// this Stats object. Two Stats objects will have the same ID if they were produced
-	// by inspecting the same underlying object.
-	ID string `json:"id"`
-
-	// Kind is "audio"
-	Kind string `json:"kind"`
-
-	// AudioLevel represents the output audio level of the track.
-	//
-	// The value is a value between 0..1 (linear), where 1.0 represents 0 dBov,
-	// 0 represents silence, and 0.5 represents approximately 6 dBSPL change in
-	// the sound pressure level from 0 dBov.
-	//
-	// If the track is sourced from a Receiver, does no audio processing, has a
-	// constant level, and has a volume setting of 1.0, the audio level is expected
-	// to be the same as the audio level of the source SSRC, while if the volume setting
-	// is 0.5, the AudioLevel is expected to be half that value.
-	//
-	// For outgoing audio tracks, the AudioLevel is the level of the audio being sent.
-	AudioLevel float64 `json:"audioLevel"`
-
-	// TotalAudioEnergy is the total energy of all the audio samples sent/received
-	// for this object, calculated by duration * Math.pow(energy/maxEnergy, 2) for
-	// each audio sample seen.
-	TotalAudioEnergy float64 `json:"totalAudioEnergy"`
-
-	// VoiceActivityFlag represents whether the last RTP packet sent or played out
-	// by this track contained voice activity or not based on the presence of the
-	// V bit in the extension header, as defined in [RFC6464].
-	//
-	// This value indicates the voice activity in the latest RTP packet played out
-	// from a given SSRC, and is defined in RTPSynchronizationSource.voiceActivityFlag.
-	VoiceActivityFlag bool `json:"voiceActivityFlag"`
-
-	// TotalSamplesDuration represents the total duration in seconds of all samples
-	// that have sent or received (and thus counted by TotalSamplesSent or TotalSamplesReceived).
-	// Can be used with TotalAudioEnergy to compute an average audio level over different intervals.
-	TotalSamplesDuration float64 `json:"totalSamplesDuration"`
-
-	// EstimatedPlayoutTimestamp is the estimated playout time of this receiver's
-	// track. The playout time is the NTP timestamp of the last playable sample that
-	// has a known timestamp (from an RTCP SR packet mapping RTP timestamps to NTP
-	// timestamps), extrapolated with the time elapsed since it was ready to be played out.
-	// This is the "current time" of the track in NTP clock time of the sender and
-	// can be present even if there is no audio currently playing.
-	//
-	// This can be useful for estimating how much audio and video is out of
-	// sync for two tracks from the same source:
-	// 		AudioTrackStats.EstimatedPlayoutTimestamp - VideoTrackStats.EstimatedPlayoutTimestamp
-	EstimatedPlayoutTimestamp StatsTimestamp `json:"estimatedPlayoutTimestamp"`
-
-	// JitterBufferDelay is the sum of the time, in seconds, each sample takes from
-	// the time it is received and to the time it exits the jitter buffer.
-	// This increases upon samples exiting, having completed their time in the buffer
-	// (incrementing JitterBufferEmittedCount). The average jitter buffer delay can
-	// be calculated by dividing the JitterBufferDelay with the JitterBufferEmittedCount.
-	JitterBufferDelay float64 `json:"jitterBufferDelay"`
-
-	// JitterBufferEmittedCount is the total number of samples that have come out
-	// of the jitter buffer (increasing JitterBufferDelay).
-	JitterBufferEmittedCount uint64 `json:"jitterBufferEmittedCount"`
-
-	// TotalSamplesReceived is the total number of samples that have been received
-	// by this receiver. This includes ConcealedSamples.
-	TotalSamplesReceived uint64 `json:"totalSamplesReceived"`
-
-	// ConcealedSamples is the total number of samples that are concealed samples.
-	// A concealed sample is a sample that is based on data that was synthesized
-	// to conceal packet loss and does not represent incoming data.
-	ConcealedSamples uint64 `json:"concealedSamples"`
-
-	// ConcealmentEvents is the number of concealment events. This counter increases
-	// every time a concealed sample is synthesized after a non-concealed sample.
-	// That is, multiple consecutive concealed samples will increase the concealedSamples
-	// count multiple times but is a single concealment event.
-	ConcealmentEvents uint64 `json:"concealmentEvents"`
-}
-
-func (s AudioReceiverStats) statsMarker() {}
-
-// VideoReceiverStats contains video metrics related to a specific receiver.
-type VideoReceiverStats struct {
-	// Timestamp is the timestamp associated with this object.
-	Timestamp StatsTimestamp `json:"timestamp"`
-
-	// Type is the object's StatsType
-	Type StatsType `json:"type"`
-
-	// ID is a unique id that is associated with the component inspected to produce
-	// this Stats object. Two Stats objects will have the same ID if they were produced
-	// by inspecting the same underlying object.
-	ID string `json:"id"`
-
-	// Kind is "video"
-	Kind string `json:"kind"`
-
-	// FrameWidth represents the width of the last processed frame for this track.
-	// Before the first frame is processed this attribute is missing.
-	FrameWidth uint32 `json:"frameWidth"`
-
-	// FrameHeight represents the height of the last processed frame for this track.
-	// Before the first frame is processed this attribute is missing.
-	FrameHeight uint32 `json:"frameHeight"`
-
-	// FramesPerSecond represents the nominal FPS value before the degradation preference
-	// is applied. It is the number of complete frames in the last second. For sending
-	// tracks it is the current captured FPS and for the receiving tracks it is the
-	// current decoding framerate.
-	FramesPerSecond float64 `json:"framesPerSecond"`
-
-	// EstimatedPlayoutTimestamp is the estimated playout time of this receiver's
-	// track. The playout time is the NTP timestamp of the last playable sample that
-	// has a known timestamp (from an RTCP SR packet mapping RTP timestamps to NTP
-	// timestamps), extrapolated with the time elapsed since it was ready to be played out.
-	// This is the "current time" of the track in NTP clock time of the sender and
-	// can be present even if there is no audio currently playing.
-	//
-	// This can be useful for estimating how much audio and video is out of
-	// sync for two tracks from the same source:
-	// 		AudioTrackStats.EstimatedPlayoutTimestamp - VideoTrackStats.EstimatedPlayoutTimestamp
-	EstimatedPlayoutTimestamp StatsTimestamp `json:"estimatedPlayoutTimestamp"`
-
-	// JitterBufferDelay is the sum of the time, in seconds, each sample takes from
-	// the time it is received and to the time it exits the jitter buffer.
-	// This increases upon samples exiting, having completed their time in the buffer
-	// (incrementing JitterBufferEmittedCount). The average jitter buffer delay can
-	// be calculated by dividing the JitterBufferDelay with the JitterBufferEmittedCount.
-	JitterBufferDelay float64 `json:"jitterBufferDelay"`
-
-	// JitterBufferEmittedCount is the total number of samples that have come out
-	// of the jitter buffer (increasing JitterBufferDelay).
-	JitterBufferEmittedCount uint64 `json:"jitterBufferEmittedCount"`
-
-	// FramesReceived Represents the total number of complete frames received for
-	// this receiver. This metric is incremented when the complete frame is received.
-	FramesReceived uint32 `json:"framesReceived"`
-
-	// KeyFramesReceived represents the total number of complete key frames received
-	// for this MediaStreamTrack, such as Intra-frames in VP8 [RFC6386] or I-frames
-	// in H.264 [RFC6184]. This is a subset of framesReceived. `framesReceived - keyFramesReceived`
-	// gives you the number of delta frames received. This metric is incremented when
-	// the complete key frame is received. It is not incremented if a partial key
-	// frame is received and sent for decoding, i.e., the frame could not be recovered
-	// via retransmission or FEC.
-	KeyFramesReceived uint32 `json:"keyFramesReceived"`
-
-	// FramesDecoded represents the total number of frames correctly decoded for this
-	// SSRC, i.e., frames that would be displayed if no frames are dropped.
-	FramesDecoded uint32 `json:"framesDecoded"`
-
-	// FramesDropped is the total number of frames dropped predecode or dropped
-	// because the frame missed its display deadline for this receiver's track.
-	FramesDropped uint32 `json:"framesDropped"`
-
-	// The cumulative number of partial frames lost. This metric is incremented when
-	// the frame is sent to the decoder. If the partial frame is received and recovered
-	// via retransmission or FEC before decoding, the FramesReceived counter is incremented.
-	PartialFramesLost uint32 `json:"partialFramesLost"`
-
-	// FullFramesLost is the cumulative number of full frames lost.
-	FullFramesLost uint32 `json:"fullFramesLost"`
-}
-
-func (s VideoReceiverStats) statsMarker() {}
-
-func unmarshalReceiverStats(b []byte) (Stats, error) {
-	type kindJSON struct {
-		Kind string `json:"kind"`
-	}
-	kindHolder := kindJSON{}
-
-	err := json.Unmarshal(b, &kindHolder)
-	if err != nil {
-		return nil, fmt.Errorf("unmarshal json kind: %w", err)
-	}
-
-	switch MediaKind(kindHolder.Kind) {
-	case MediaKindAudio:
-		var receiverStats AudioReceiverStats
-		err := json.Unmarshal(b, &receiverStats)
-		if err != nil {
-			return nil, fmt.Errorf("unmarshal audio receiver stats: %w", err)
-		}
-
-		return receiverStats, nil
-	case MediaKindVideo:
-		var receiverStats VideoReceiverStats
-		err := json.Unmarshal(b, &receiverStats)
-		if err != nil {
-			return nil, fmt.Errorf("unmarshal video receiver stats: %w", err)
-		}
-
-		return receiverStats, nil
-	default:
-		return nil, fmt.Errorf("kind: %w", ErrUnknownType)
-	}
-}
-
-// TransportStats contains transport statistics related to the PeerConnection object.
+// TransportStats contains statistics for a DTLS transport and its underlying ICE transport.
 type TransportStats struct {
 	// Timestamp is the timestamp associated with this object.
 	Timestamp StatsTimestamp `json:"timestamp"`
@@ -1782,10 +1280,10 @@ type TransportStats struct {
 	ID string `json:"id"`
 
 	// PacketsSent represents the total number of packets sent over this transport.
-	PacketsSent uint32 `json:"packetsSent"`
+	PacketsSent uint64 `json:"packetsSent"`
 
 	// PacketsReceived represents the total number of packets received on this transport.
-	PacketsReceived uint32 `json:"packetsReceived"`
+	PacketsReceived uint64 `json:"packetsReceived"`
 
 	// BytesSent represents the total number of payload bytes sent on this PeerConnection
 	// not including headers or padding.
@@ -1794,11 +1292,6 @@ type TransportStats struct {
 	// BytesReceived represents the total number of bytes received on this PeerConnection
 	// not including headers or padding.
 	BytesReceived uint64 `json:"bytesReceived"`
-
-	// RTCPTransportStatsID is the ID of the transport that gives stats for the RTCP
-	// component If RTP and RTCP are not multiplexed and this record has only
-	// the RTP component stats.
-	RTCPTransportStatsID string `json:"rtcpTransportStatsId"`
 
 	// ICERole is set to the current value of the "role" attribute of the underlying
 	// DTLSTransport's "iceTransport".
@@ -1817,20 +1310,24 @@ type TransportStats struct {
 
 	// LocalCertificateID is the ID of the CertificateStats for the local certificate.
 	// Present only if DTLS is negotiated.
-	LocalCertificateID string `json:"localCertificateId"`
+	LocalCertificateID string `json:"localCertificateId,omitempty"`
 
 	// RemoteCertificateID is the ID of the CertificateStats for the remote certificate.
 	// Present only if DTLS is negotiated.
-	RemoteCertificateID string `json:"remoteCertificateId"`
+	RemoteCertificateID string `json:"remoteCertificateId,omitempty"`
+
+	// TLSVersion is the negotiated DTLS version as four uppercase hexadecimal digits.
+	// It is omitted from JSON until DTLS negotiation completes.
+	TLSVersion string `json:"tlsVersion,omitempty"`
 
 	// DTLSCipher is the descriptive name of the cipher suite used for the DTLS transport,
 	// as defined in the "Description" column of the IANA cipher suite registry.
-	DTLSCipher string `json:"dtlsCipher"`
+	DTLSCipher string `json:"dtlsCipher,omitempty"`
 
 	// SRTPCipher is the descriptive name of the protection profile used for the SRTP
 	// transport, as defined in the "Profile" column of the IANA DTLS-SRTP protection
 	// profile registry.
-	SRTPCipher string `json:"srtpCipher"`
+	SRTPCipher string `json:"srtpCipher,omitempty"`
 }
 
 func (s TransportStats) statsMarker() {}
@@ -1972,10 +1469,10 @@ type ICECandidatePairStats struct {
 	Nominated bool `json:"nominated"`
 
 	// PacketsSent represents the total number of packets sent on this candidate pair.
-	PacketsSent uint32 `json:"packetsSent"`
+	PacketsSent uint64 `json:"packetsSent"`
 
 	// PacketsReceived represents the total number of packets received on this candidate pair.
-	PacketsReceived uint32 `json:"packetsReceived"`
+	PacketsReceived uint64 `json:"packetsReceived"`
 
 	// BytesSent represents the total number of payload bytes sent on this candidate pair
 	// not including headers or padding.
@@ -2095,7 +1592,7 @@ type ICECandidatePairStats struct {
 	// when handing the packets containing the bytes to the socket. This might happen due
 	// to various reasons, including full buffer or no available memory.
 	// Calculated as defined in [RFC3550] section 6.4.1.
-	BytesDiscardedOnSend uint32 `json:"bytesDiscardedOnSend"`
+	BytesDiscardedOnSend uint64 `json:"bytesDiscardedOnSend"`
 }
 
 func (s ICECandidatePairStats) statsMarker() {}
@@ -2166,14 +1663,6 @@ type ICECandidateStats struct {
 	// TURN server. This is only present for local candidates. Valid values for
 	// the TURN URL protocol is one of udp, tcp, or tls.
 	RelayProtocol string `json:"relayProtocol"`
-
-	// Deleted is true if the candidate has been deleted/freed. For host candidates,
-	// this means that any network resources (typically a socket) associated with the
-	// candidate have been released. For TURN candidates, this means the TURN allocation
-	// is no longer active.
-	//
-	// Only defined for local candidates. For remote candidates, this property is not applicable.
-	Deleted bool `json:"deleted"`
 }
 
 func (s ICECandidateStats) statsMarker() {}
@@ -2213,7 +1702,7 @@ type CertificateStats struct {
 	// IssuerCertificateID refers to the stats object that contains the next certificate
 	// in the certificate chain. If the current certificate is at the end of the chain
 	// (i.e. a self-signed certificate), this will not be set.
-	IssuerCertificateID string `json:"issuerCertificateId"`
+	IssuerCertificateID string `json:"issuerCertificateId,omitempty"`
 }
 
 func (s CertificateStats) statsMarker() {}
@@ -2290,8 +1779,8 @@ var (
 	inboundRTPVideoOnlyMembers = []string{
 		"framesDecoded", "keyFramesDecoded", "framesRendered", "framesDropped",
 		"frameWidth", "frameHeight", "framesPerSecond", "qpSum", "totalDecodeTime",
-		"totalInterFrameDelay", "totalSquaredInterFrameDelay", "firCount", "pliCount",
-		"framesReceived", "decoderImplementation", "powerEfficientDecoder",
+		"totalInterFrameDelay", "totalSquaredInterFrameDelay", "pauseCount", "totalPausesDuration",
+		"freezeCount", "totalFreezesDuration", "firCount", "pliCount", "framesReceived", "decoderImplementation", "powerEfficientDecoder",
 		"framesAssembledFromMultiplePackets", "totalAssemblyTime",
 		"totalCorruptionProbability", "totalSquaredCorruptionProbability", "corruptionMeasurements",
 	}
@@ -2317,10 +1806,10 @@ func marshalKindGated(stats any, kind string, videoOnly, audioOnly []string) ([]
 	}
 
 	var drop []string
-	switch kind {
-	case "audio":
+	switch MediaKind(kind) {
+	case MediaKindAudio:
 		drop = videoOnly
-	case "video":
+	case MediaKindVideo:
 		drop = audioOnly
 	}
 	if len(drop) == 0 {

@@ -8,10 +8,18 @@ package webrtc
 import (
 	"bytes"
 	"context"
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
 	"crypto/tls"
 	"crypto/x509"
+	"crypto/x509/pkix"
+	"encoding/base64"
+	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
+	"math/big"
 	"net"
 	"regexp"
 	"testing"
@@ -29,7 +37,13 @@ import (
 )
 
 // An invalid fingerprint MUST cause DTLSTransport to go to failed state.
-func TestInvalidFingerprintCausesFailed(t *testing.T) { //nolint:cyclop
+func TestInvalidFingerprintCausesFailed(t *testing.T) {
+	t.Run("Initial", func(t *testing.T) { testInvalidFingerprintCausesFailed(t, false) })
+	t.Run("Restart", func(t *testing.T) { testInvalidFingerprintCausesFailed(t, true) })
+}
+
+func testInvalidFingerprintCausesFailed(t *testing.T, restart bool) { //nolint:cyclop
+	t.Helper()
 	lim := test.TimeOut(time.Second * 10)
 	defer lim.Stop()
 
@@ -42,11 +56,21 @@ func TestInvalidFingerprintCausesFailed(t *testing.T) { //nolint:cyclop
 	pcAnswer, err := NewPeerConnection(Configuration{})
 	assert.NoError(t, err)
 
-	pcAnswer.OnDataChannel(func(_ *DataChannel) {
-		assert.Fail(t, "A DataChannel must not be created when Fingerprint verification fails")
-	})
-
 	defer closePairNow(t, pcOffer, pcAnswer)
+
+	_, err = pcOffer.CreateDataChannel("unusedDataChannel", nil)
+	require.NoError(t, err)
+	if restart {
+		connected := untilConnectionState(PeerConnectionStateConnected, pcOffer, pcAnswer)
+		require.NoError(t, signalPairWithOptions(pcOffer, pcAnswer, withDisableInitialDataChannel(true)))
+		<-connected
+		pcOffer.ops.Done()
+		pcAnswer.ops.Done()
+	} else {
+		pcAnswer.OnDataChannel(func(_ *DataChannel) {
+			assert.Fail(t, "A DataChannel must not be created when Fingerprint verification fails")
+		})
+	}
 
 	// Set up DTLS state tracking BEFORE starting the connection process
 	// to avoid missing the state transition
@@ -73,30 +97,19 @@ func TestInvalidFingerprintCausesFailed(t *testing.T) { //nolint:cyclop
 		}
 	})
 
-	offerChan := make(chan SessionDescription)
-	pcOffer.OnICECandidate(func(candidate *ICECandidate) {
-		if candidate == nil {
-			offerChan <- *pcOffer.PendingLocalDescription()
-		}
-	})
-
 	peerConnectionsFailed := untilConnectionState(PeerConnectionStateFailed, pcOffer, pcAnswer)
 
-	_, err = pcOffer.CreateDataChannel("unusedDataChannel", nil)
-	assert.NoError(t, err)
-
-	offer, err := pcOffer.CreateOffer(nil)
-	assert.NoError(t, err)
-	assert.NoError(t, pcOffer.SetLocalDescription(offer))
+	offer, err := pcOffer.CreateOffer(&OfferOptions{DTLSRestart: restart})
+	require.NoError(t, err)
+	offerGathered := GatheringCompletePromise(pcOffer)
+	require.NoError(t, pcOffer.SetLocalDescription(offer))
 
 	select {
-	case offer := <-offerChan:
+	case <-offerGathered:
+		offer = *pcOffer.LocalDescription()
 		// Replace with invalid fingerprint
 		re := regexp.MustCompile(`sha-256 (.*?)\r`)
-		offer.SDP = re.ReplaceAllString(
-			offer.SDP,
-			"sha-256 AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA\r",
-		)
+		offer.SDP = re.ReplaceAllString(offer.SDP, "sha-256 AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA\r")
 
 		assert.NoError(t, pcAnswer.SetRemoteDescription(offer))
 
@@ -104,10 +117,7 @@ func TestInvalidFingerprintCausesFailed(t *testing.T) { //nolint:cyclop
 		assert.NoError(t, err)
 		assert.NoError(t, pcAnswer.SetLocalDescription(answer))
 
-		answer.SDP = re.ReplaceAllString(
-			answer.SDP,
-			"sha-256 AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA\r",
-		)
+		answer.SDP = re.ReplaceAllString(answer.SDP, "sha-256 AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA\r")
 
 		assert.NoError(t, pcOffer.SetRemoteDescription(answer))
 	case <-time.After(5 * time.Second):
@@ -139,6 +149,45 @@ func TestInvalidFingerprintCausesFailed(t *testing.T) { //nolint:cyclop
 	assert.Equal(t, DTLSTransportStateFailed, pcAnswer.SCTP().Transport().State())
 	assert.Nil(t, pcAnswer.SCTP().Transport().conn)
 	assert.False(t, pcAnswer.isClosed.Load())
+}
+
+func TestDTLSFailureAfterConnected(t *testing.T) {
+	defer test.TimeOut(10 * time.Second).Stop()
+	defer test.CheckRoutines(t)()
+	offer, answer, err := newPair()
+	require.NoError(t, err)
+	defer closePairNow(t, offer, answer)
+	_, err = offer.AddTransceiverFromKind(RTPCodecTypeVideo)
+	require.NoError(t, err)
+	connected := untilConnectionState(PeerConnectionStateConnected, offer, answer)
+	require.NoError(t, signalPairWithOptions(offer, answer, withDisableInitialDataChannel(true)))
+	<-connected
+
+	failed := untilConnectionState(PeerConnectionStateFailed, offer)
+	dtlsFailed := make(chan struct{})
+	transport := offer.dtlsTransport
+	transport.OnStateChange(func(state DTLSTransportState) {
+		if state == DTLSTransportStateFailed {
+			close(dtlsFailed)
+		}
+	})
+	iceTransport := transport.ICETransport()
+	iceTransport.lock.Lock()
+	conn := iceTransport.conn
+	iceTransport.conn = &errConn{writeErr: errTestWriteFailed}
+	iceTransport.lock.Unlock()
+	defer func() {
+		iceTransport.lock.Lock()
+		iceTransport.conn = conn
+		iceTransport.lock.Unlock()
+	}()
+	_, err = transport.conn.Write([]byte{1})
+	require.NoError(t, err)
+	<-failed
+	<-dtlsFailed
+	assert.Equal(t, DTLSTransportStateFailed, transport.State())
+	assert.Equal(t, ICEConnectionStateConnected, offer.ICEConnectionState())
+	assert.False(t, offer.isClosed.Load())
 }
 
 // DTLS closure updates the transport without closing the PeerConnection.
@@ -247,6 +296,19 @@ func TestPeerConnection_DTLSVersion(t *testing.T) {
 			require.NoError(t, err)
 			defer func() { require.NoError(t, answer.Close()) }()
 
+			for _, peer := range []*PeerConnection{offer, answer} {
+				stats := getTransportStats(t, peer.GetStats(), peer.dtlsTransport)
+				assert.Equal(t, DTLSTransportStateNew, stats.DTLSState)
+				assert.Equal(t, ICETransportStateNew, stats.ICEState)
+				encoded, marshalErr := json.Marshal(stats)
+				require.NoError(t, marshalErr)
+				var fields map[string]json.RawMessage
+				require.NoError(t, json.Unmarshal(encoded, &fields))
+				for _, name := range []string{"tlsVersion", "dtlsCipher", "srtpCipher"} {
+					assert.NotContains(t, fields, name)
+				}
+			}
+
 			connected := untilConnectionState(PeerConnectionStateConnected, offer, answer)
 			require.NoError(t, signalPair(offer, answer))
 			<-connected
@@ -254,6 +316,30 @@ func TestPeerConnection_DTLSVersion(t *testing.T) {
 				state, ok := peer.dtlsTransport.dtlsConn.ConnectionState()
 				require.True(t, ok)
 				require.Equal(t, tc.want, state.NegotiatedVersion())
+				stats := getTransportStats(t, peer.GetStats(), peer.dtlsTransport)
+				assert.Equal(t, fmt.Sprintf("%04X", tc.want), stats.TLSVersion)
+				assert.Equal(t, peer.iceTransport.Role(), stats.ICERole)
+				assert.Equal(t, peer.iceTransport.State(), stats.ICEState)
+				assert.Equal(t, DTLSTransportStateConnected, stats.DTLSState)
+				directStats := peer.dtlsTransport.Stats()
+				assert.Equal(t, stats.ID, directStats.ID)
+				assert.Equal(t, stats.TLSVersion, directStats.TLSVersion)
+				assert.NotZero(t, directStats.BytesSent)
+				assert.NotZero(t, directStats.BytesReceived)
+				assert.Equal(t, state.CipherSuiteID.String(), stats.DTLSCipher)
+				assert.NotEmpty(t, stats.DTLSCipher)
+				assert.Equal(t, "SRTP_AEAD_AES_256_GCM", stats.SRTPCipher)
+			}
+			for _, peer := range []*PeerConnection{offer, answer} {
+				stats := peer.dtlsTransport.Stats()
+				require.NoError(t, peer.Close())
+				closedStats := getTransportStats(t, peer.GetStats(), peer.dtlsTransport)
+				assert.Equal(t, stats.ID, closedStats.ID)
+				assert.Equal(t, DTLSTransportStateClosed, closedStats.DTLSState)
+				assert.Equal(t, ICETransportStateClosed, closedStats.ICEState)
+				assert.Equal(t, stats.TLSVersion, closedStats.TLSVersion)
+				assert.Equal(t, stats.DTLSCipher, closedStats.DTLSCipher)
+				assert.Equal(t, stats.SRTPCipher, closedStats.SRTPCipher)
 			}
 		})
 	}
@@ -276,9 +362,7 @@ func TestDTLSTransport_InvalidVersionRange(t *testing.T) {
 			transport, err := api.NewDTLSTransport(nil, nil)
 			require.NoError(t, err)
 			cert := transport.certificates[0]
-			opts := transport.dtlsSharedOptions(tls.Certificate{
-				Certificate: [][]byte{cert.x509Cert.Raw}, PrivateKey: cert.privateKey,
-			})
+			opts := transport.dtlsSharedOptions(tls.Certificate{Certificate: [][]byte{cert.x509Cert.Raw}, PrivateKey: cert.privateKey})
 			addr := &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 4444}
 			_, err = dtls.DetachedClient(addr, transport.toDTLSClientOptions(opts)...)
 			require.Error(t, err)
@@ -576,7 +660,30 @@ func TestDTLSTransport_verifyPeerCertificateFunc_ParseError(t *testing.T) {
 	rawCert := []byte("not a certificate")
 	err := transport.verifyPeerCertificateFunc()([][]byte{rawCert}, nil)
 	assert.Error(t, err)
-	assert.Equal(t, rawCert, transport.GetRemoteCertificate())
+	assert.Nil(t, transport.GetRemoteCertificate())
+}
+
+func TestDTLSTransport_verifyPeerCertificateFunc_FingerprintMismatch(t *testing.T) {
+	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	require.NoError(t, err)
+	certificate, err := GenerateCertificate(key)
+	require.NoError(t, err)
+	fingerprints, err := certificate.GetFingerprints()
+	require.NoError(t, err)
+	rawCerts := [][]byte{certificate.x509Cert.Raw}
+
+	transport := &DTLSTransport{api: NewAPI(), remoteParameters: DTLSParameters{
+		Fingerprints: []DTLSFingerprint{{Algorithm: "sha-256", Value: "00"}},
+	}}
+	err = transport.verifyPeerCertificateFunc()(rawCerts, nil)
+	assert.ErrorIs(t, err, errNoMatchingCertificateFingerprint)
+	assert.Nil(t, transport.GetRemoteCertificate())
+	assert.Nil(t, transport.remoteCertificates)
+
+	transport.remoteParameters.Fingerprints = fingerprints
+	require.NoError(t, transport.verifyPeerCertificateFunc()(rawCerts, nil))
+	assert.Equal(t, rawCerts[0], transport.GetRemoteCertificate())
+	assert.Equal(t, rawCerts, transport.remoteCertificates)
 }
 
 func TestDTLSTransport_toDTLSServerOptions_IncludesOptionalOptions(t *testing.T) {
@@ -601,8 +708,8 @@ func TestDTLSTransport_toDTLSServerOptions_IncludesOptionalOptions(t *testing.T)
 		{
 			name: "CertificateRequestMessageHook",
 			configure: func(se *SettingEngine) {
-				se.dtls.certificateRequestMessageHook = func(m handshake.MessageCertificateRequest) handshake.Message {
-					return &m
+				se.dtls.certificateRequestMessageHook = func(m handshake.Message) handshake.Message {
+					return m
 				}
 			},
 			wantExtra: 1,
@@ -613,8 +720,8 @@ func TestDTLSTransport_toDTLSServerOptions_IncludesOptionalOptions(t *testing.T)
 				se.dtls.serverHelloMessageHook = func(m handshake.MessageServerHello) handshake.Message {
 					return &m
 				}
-				se.dtls.certificateRequestMessageHook = func(m handshake.MessageCertificateRequest) handshake.Message {
-					return &m
+				se.dtls.certificateRequestMessageHook = func(m handshake.Message) handshake.Message {
+					return m
 				}
 			},
 			wantExtra: 2,
@@ -724,4 +831,42 @@ func TestDTLSTransport_StartContextInterruptedWhileWaitingForICE(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestDTLSTransport_Stats_RemoteCertificateChain(t *testing.T) {
+	caKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	require.NoError(t, err)
+	caTemplate := &x509.Certificate{
+		SerialNumber:          big.NewInt(1),
+		Subject:               pkix.Name{CommonName: "ca"},
+		NotAfter:              time.Now().Add(time.Hour),
+		IsCA:                  true,
+		BasicConstraintsValid: true,
+	}
+	caDER, err := x509.CreateCertificate(rand.Reader, caTemplate, caTemplate, &caKey.PublicKey, caKey)
+	require.NoError(t, err)
+
+	leafKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	require.NoError(t, err)
+	leafTemplate := &x509.Certificate{
+		SerialNumber: big.NewInt(2),
+		Subject:      pkix.Name{CommonName: "leaf"},
+		NotAfter:     time.Now().Add(time.Hour),
+	}
+	leafDER, err := x509.CreateCertificate(rand.Reader, leafTemplate, caTemplate, &leafKey.PublicKey, caKey)
+	require.NoError(t, err)
+
+	transport := &DTLSTransport{remoteCertificates: [][]byte{leafDER, caDER}}
+	transport.setRemoteCertificateStats()
+	transportStats, certificateStats := transport.stats()
+	require.Len(t, certificateStats, 2)
+	certificates := map[string]CertificateStats{}
+	for _, c := range certificateStats {
+		certificates[c.ID] = c
+	}
+	leaf := certificates[transportStats.RemoteCertificateID]
+	assert.Equal(t, base64.StdEncoding.EncodeToString(leafDER), leaf.Base64Certificate)
+	ca := certificates[leaf.IssuerCertificateID]
+	assert.Equal(t, base64.StdEncoding.EncodeToString(caDER), ca.Base64Certificate)
+	assert.Empty(t, ca.IssuerCertificateID)
 }

@@ -10,9 +10,11 @@ import (
 	"crypto/elliptic"
 	"crypto/rand"
 	"encoding/base64"
+	"slices"
 	"strings"
 	"testing"
 
+	"github.com/pion/logging"
 	"github.com/pion/sdp/v3"
 	"github.com/pion/transport/v5/test"
 	"github.com/stretchr/testify/assert"
@@ -118,7 +120,7 @@ func TestExtractFingerprint(t *testing.T) {
 	})
 }
 
-func TestExtractICEDetails(t *testing.T) { //nolint:maintidx
+func TestExtractICEDetails(t *testing.T) {
 	const defaultUfrag = "defaultUfrag"
 	const defaultPwd = "defaultPwd"
 	const invalidUfrag = "invalidUfrag"
@@ -474,37 +476,52 @@ func TestSelectCandidateMediaSection(t *testing.T) {
 }
 
 func TestTrackDetailsFromSDP(t *testing.T) {
-	t.Run("one track per media section", func(t *testing.T) {
-		descr := &sdp.SessionDescription{MediaDescriptions: []*sdp.MediaDescription{{
-			MediaName: sdp.MediaName{Media: "video"},
-			Attributes: []sdp.Attribute{
-				{Key: "mid", Value: "0"},
-				{Key: "ssrc", Value: "4000 msid:repair repair-track"},
-				{Key: "ssrc", Value: "3000 msid:source source-track"},
-				{Key: "ssrc", Value: "5000 msid:other other-track"},
-				{Key: "ssrc", Value: "6000 msid:fec fec-track"},
-				{Key: "ssrc-group", Value: "FID 3000 4000"},
-				{Key: "ssrc-group", Value: "FEC-FR 3000 6000"},
-				{Key: "msid", Value: "stream track"},
-			},
-		}}}
+	for group, expected := range map[string][]SSRC{
+		"":                      {3000},
+		"SIM 3000 5000":         {3000, 5000},
+		"SIM 5000 3000":         {5000, 3000},
+		"SIM 3000 invalid 5000": {3000, 5000},
+		"SIM":                   {3000},
+	} {
+		t.Run("one track per media section/"+group, func(t *testing.T) {
+			descr := &sdp.SessionDescription{MediaDescriptions: []*sdp.MediaDescription{{
+				MediaName: sdp.MediaName{Media: "video", Port: sdp.RangedPort{Value: 9}},
+				Attributes: []sdp.Attribute{
+					{Key: "mid", Value: "0"},
+					{Key: "ssrc-group", Value: group},
+					{Key: "ssrc", Value: "4000 msid:repair repair-track"},
+					{Key: "ssrc", Value: "3000 msid:source source-track"},
+					{Key: "ssrc", Value: "5000 msid:other other-track"},
+					{Key: "ssrc", Value: "6000 msid:fec fec-track"},
+					{Key: "ssrc-group", Value: "FID 3000 4000"},
+					{Key: "ssrc-group", Value: "FEC-FR 3000 6000"},
+					{Key: "msid", Value: "stream track"},
+				},
+			}}}
 
-		tracks := trackDetailsFromSDP(nil, descr)
-		require.Len(t, tracks, 1)
-		assert.Equal(t, []SSRC{3000}, tracks[0].ssrcs)
-		assert.Equal(t, "stream", tracks[0].streamID)
-		assert.Equal(t, "track", tracks[0].id)
-		require.NotNil(t, tracks[0].rtxSsrc)
-		require.NotNil(t, tracks[0].fecSsrc)
-		assert.Equal(t, SSRC(4000), *tracks[0].rtxSsrc)
-		assert.Equal(t, SSRC(6000), *tracks[0].fecSsrc)
-	})
+			tracks := trackDetailsFromSDP(logging.NewDefaultLoggerFactory().NewLogger("test"), descr)
+			require.Len(t, tracks, 1)
+			assert.Equal(t, expected, tracks[0].ssrcs)
+			assert.Equal(t, "stream", tracks[0].streamID)
+			assert.Equal(t, "track", tracks[0].id)
+			for _, encoding := range trackDetailsToRTPReceiveParameters(&tracks[0]).Encodings {
+				if encoding.SSRC == 3000 {
+					assert.Equal(t, SSRC(4000), encoding.RTX.SSRC)
+					assert.Equal(t, SSRC(6000), encoding.FEC.SSRC)
+				} else {
+					assert.Zero(t, encoding.RTX.SSRC)
+					assert.Zero(t, encoding.FEC.SSRC)
+				}
+			}
+		})
+	}
 
 	t.Run("Tracks unknown, audio and video with RTX", func(t *testing.T) {
 		descr := &sdp.SessionDescription{
 			MediaDescriptions: []*sdp.MediaDescription{
 				{
 					MediaName: sdp.MediaName{
+						Port:  sdp.RangedPort{Value: 9},
 						Media: "foobar",
 					},
 					Attributes: []sdp.Attribute{
@@ -515,6 +532,7 @@ func TestTrackDetailsFromSDP(t *testing.T) {
 				},
 				{
 					MediaName: sdp.MediaName{
+						Port:  sdp.RangedPort{Value: 9},
 						Media: "audio",
 					},
 					Attributes: []sdp.Attribute{
@@ -525,6 +543,7 @@ func TestTrackDetailsFromSDP(t *testing.T) {
 				},
 				{
 					MediaName: sdp.MediaName{
+						Port:  sdp.RangedPort{Value: 9},
 						Media: "video",
 					},
 					Attributes: []sdp.Attribute{
@@ -537,6 +556,7 @@ func TestTrackDetailsFromSDP(t *testing.T) {
 				},
 				{
 					MediaName: sdp.MediaName{
+						Port:  sdp.RangedPort{Value: 9},
 						Media: "video",
 					},
 					Attributes: []sdp.Attribute{
@@ -548,6 +568,7 @@ func TestTrackDetailsFromSDP(t *testing.T) {
 				},
 				{
 					MediaName: sdp.MediaName{
+						Port:  sdp.RangedPort{Value: 9},
 						Media: "video",
 					},
 					Attributes: []sdp.Attribute{
@@ -595,6 +616,7 @@ func TestTrackDetailsFromSDP(t *testing.T) {
 			MediaDescriptions: []*sdp.MediaDescription{
 				{
 					MediaName: sdp.MediaName{
+						Port:  sdp.RangedPort{Value: 9},
 						Media: "video",
 					},
 					Attributes: []sdp.Attribute{
@@ -616,10 +638,12 @@ func TestTrackDetailsFromSDP(t *testing.T) {
 		assert.Equal(t, RTPCodecTypeVideo, track.kind)
 		assert.Equal(t, SSRC(3000), track.ssrcs[0])
 		assert.Equal(t, "video_trk_label", track.streamID)
-		require.NotNil(t, track.rtxSsrc, "missing RTX ssrc for video track")
-		assert.Equal(t, SSRC(4000), *track.rtxSsrc)
-		require.NotNil(t, track.fecSsrc, "missing FEC ssrc for video track")
-		assert.Equal(t, SSRC(5000), *track.fecSsrc)
+		require.Len(t, track.rtxSsrc, 1)
+		require.NotNil(t, track.rtxSsrc[0], "missing RTX ssrc for video track")
+		assert.Equal(t, SSRC(4000), *track.rtxSsrc[0])
+		require.Len(t, track.fecSsrc, 1)
+		require.NotNil(t, track.fecSsrc[0], "missing FEC ssrc for video track")
+		assert.Equal(t, SSRC(5000), *track.fecSsrc[0])
 	})
 
 	t.Run("inactive and recvonly tracks ignored", func(t *testing.T) {
@@ -627,6 +651,7 @@ func TestTrackDetailsFromSDP(t *testing.T) {
 			MediaDescriptions: []*sdp.MediaDescription{
 				{
 					MediaName: sdp.MediaName{
+						Port:  sdp.RangedPort{Value: 9},
 						Media: "video",
 					},
 					Attributes: []sdp.Attribute{
@@ -636,6 +661,7 @@ func TestTrackDetailsFromSDP(t *testing.T) {
 				},
 				{
 					MediaName: sdp.MediaName{
+						Port:  sdp.RangedPort{Value: 9},
 						Media: "video",
 					},
 					Attributes: []sdp.Attribute{
@@ -653,6 +679,7 @@ func TestTrackDetailsFromSDP(t *testing.T) {
 			MediaDescriptions: []*sdp.MediaDescription{
 				{
 					MediaName: sdp.MediaName{
+						Port:  sdp.RangedPort{Value: 9},
 						Media: "video",
 					},
 					Attributes: []sdp.Attribute{
@@ -665,6 +692,7 @@ func TestTrackDetailsFromSDP(t *testing.T) {
 				},
 				{
 					MediaName: sdp.MediaName{
+						Port:  sdp.RangedPort{Value: 9},
 						Media: "video",
 					},
 					Attributes: []sdp.Attribute{
@@ -680,8 +708,10 @@ func TestTrackDetailsFromSDP(t *testing.T) {
 
 		tracks := trackDetailsFromSDP(nil, descr)
 		assert.Equal(t, 2, len(tracks))
-		assert.Equal(t, SSRC(4000), *tracks[0].rtxSsrc)
-		assert.Equal(t, SSRC(6000), *tracks[1].rtxSsrc)
+		require.Len(t, tracks[0].rtxSsrc, 1)
+		assert.Equal(t, SSRC(4000), *tracks[0].rtxSsrc[0])
+		require.Len(t, tracks[1].rtxSsrc, 1)
+		assert.Equal(t, SSRC(6000), *tracks[1].rtxSsrc[0])
 	})
 }
 
@@ -773,6 +803,7 @@ func TestMediaDescriptionFingerprints(t *testing.T) {
 			assert.NoError(t, err)
 
 			testSdp, err = populateSDP(testSdp,
+				false,
 				dtlsFingerprints,
 				SDPMediaDescriptionFingerprints,
 				false,
@@ -801,7 +832,7 @@ func TestMediaDescriptionFingerprints(t *testing.T) {
 	t.Run("Per-Session Description Fingerprints", fingerprintTest(false, 1))
 }
 
-func TestPopulateSDP(t *testing.T) { //nolint:gocyclo,cyclop,maintidx
+func TestPopulateSDP(t *testing.T) { //nolint:cyclop
 	t.Run("rid", func(t *testing.T) {
 		se := SettingEngine{}
 
@@ -828,6 +859,7 @@ func TestPopulateSDP(t *testing.T) { //nolint:gocyclo,cyclop,maintidx
 
 		offerSdp, err := populateSDP(
 			d,
+			false,
 			[]DTLSFingerprint{},
 			se.sdpMediaLevelFingerprints,
 			se.candidates.ICELite,
@@ -890,6 +922,7 @@ func TestPopulateSDP(t *testing.T) { //nolint:gocyclo,cyclop,maintidx
 
 		offerSdp, err := populateSDP(
 			d,
+			false,
 			[]DTLSFingerprint{},
 			se.sdpMediaLevelFingerprints,
 			se.candidates.ICELite,
@@ -936,12 +969,7 @@ func TestPopulateSDP(t *testing.T) { //nolint:gocyclo,cyclop,maintidx
 
 		tr := &RTPTransceiver{kind: RTPCodecTypeVideo, api: api, codecs: me.videoCodecs}
 		tr.setDirection(RTPTransceiverDirectionRecvonly)
-		codecErr := tr.SetCodecPreferences([]RTPCodecParameters{
-			{
-				RTPCodecCapability: RTPCodecCapability{MimeTypeVP8, 90000, 0, "", nil},
-				PayloadType:        96,
-			},
-		})
+		codecErr := tr.SetCodecPreferences([]RTPCodecParameters{{RTPCodecCapability: RTPCodecCapability{MimeTypeVP8, 90000, 0, "", nil}, PayloadType: 96}})
 		assert.NoError(t, codecErr)
 
 		mediaSections := []mediaSection{{id: "video", transceivers: []*RTPTransceiver{tr}}}
@@ -950,6 +978,7 @@ func TestPopulateSDP(t *testing.T) { //nolint:gocyclo,cyclop,maintidx
 
 		offerSdp, err := populateSDP(
 			d,
+			false,
 			[]DTLSFingerprint{},
 			se.sdpMediaLevelFingerprints,
 			se.candidates.ICELite,
@@ -991,6 +1020,7 @@ func TestPopulateSDP(t *testing.T) { //nolint:gocyclo,cyclop,maintidx
 
 		offerSdp, err := populateSDP(
 			&sdp.SessionDescription{},
+			false,
 			[]DTLSFingerprint{},
 			se.sdpMediaLevelFingerprints,
 			se.candidates.ICELite,
@@ -1026,16 +1056,7 @@ func TestPopulateSDP(t *testing.T) { //nolint:gocyclo,cyclop,maintidx
 		se := SettingEngine{}
 
 		me := &MediaEngine{}
-		registerCodecErr := me.RegisterCodec(RTPCodecParameters{
-			RTPCodecCapability: RTPCodecCapability{
-				MimeType:     MimeTypeVP8,
-				ClockRate:    90000,
-				Channels:     0,
-				SDPFmtpLine:  "",
-				RTCPFeedback: nil,
-			},
-			PayloadType: 96,
-		}, RTPCodecTypeVideo)
+		registerCodecErr := me.RegisterCodec(RTPCodecParameters{RTPCodecCapability: RTPCodecCapability{MimeType: MimeTypeVP8, ClockRate: 90000, Channels: 0, SDPFmtpLine: "", RTCPFeedback: nil}, PayloadType: 96}, RTPCodecTypeVideo)
 		assert.NoError(t, registerCodecErr)
 		api := NewAPI(WithMediaEngine(me))
 
@@ -1050,6 +1071,7 @@ func TestPopulateSDP(t *testing.T) { //nolint:gocyclo,cyclop,maintidx
 
 		offerSdp, err := populateSDP(
 			d,
+			false,
 			[]DTLSFingerprint{},
 			se.sdpMediaLevelFingerprints,
 			se.candidates.ICELite,
@@ -1085,6 +1107,7 @@ func TestPopulateSDP(t *testing.T) { //nolint:gocyclo,cyclop,maintidx
 		se := SettingEngine{}
 		offerSdp, err := populateSDP(
 			&sdp.SessionDescription{},
+			false,
 			[]DTLSFingerprint{},
 			se.sdpMediaLevelFingerprints,
 			se.candidates.ICELite,
@@ -1117,6 +1140,7 @@ func TestPopulateSDP(t *testing.T) { //nolint:gocyclo,cyclop,maintidx
 
 		offerSdp, err = populateSDP(
 			&sdp.SessionDescription{},
+			false,
 			[]DTLSFingerprint{},
 			se.sdpMediaLevelFingerprints,
 			se.candidates.ICELite,
@@ -1161,6 +1185,7 @@ func TestPopulateSDP(t *testing.T) { //nolint:gocyclo,cyclop,maintidx
 
 		offerSdp, err := populateSDP(
 			d,
+			false,
 			[]DTLSFingerprint{},
 			se.sdpMediaLevelFingerprints,
 			se.candidates.ICELite,
@@ -1199,9 +1224,10 @@ func TestPopulateSDP(t *testing.T) { //nolint:gocyclo,cyclop,maintidx
 
 		d := &sdp.SessionDescription{}
 
-		matchedBundle := "audio"
+		matchedBundle := (&sdp.SessionDescription{}).WithValueAttribute(sdp.AttrKeyGroup, "BUNDLE audio")
 		offerSdp, err := populateSDP(
 			d,
+			false,
 			[]DTLSFingerprint{},
 			se.sdpMediaLevelFingerprints,
 			se.candidates.ICELite,
@@ -1212,7 +1238,7 @@ func TestPopulateSDP(t *testing.T) { //nolint:gocyclo,cyclop,maintidx
 			ICEParameters{},
 			mediaSections,
 			ICEGatheringStateComplete,
-			&matchedBundle,
+			matchedBundle,
 			se.getSCTPMaxMessageSize(),
 			false,
 			false,
@@ -1242,9 +1268,10 @@ func TestPopulateSDP(t *testing.T) { //nolint:gocyclo,cyclop,maintidx
 
 		d := &sdp.SessionDescription{}
 
-		matchedBundle := ""
+		matchedBundle := &sdp.SessionDescription{}
 		offerSdp, err := populateSDP(
 			d,
+			false,
 			[]DTLSFingerprint{},
 			se.sdpMediaLevelFingerprints,
 			se.candidates.ICELite,
@@ -1255,7 +1282,7 @@ func TestPopulateSDP(t *testing.T) { //nolint:gocyclo,cyclop,maintidx
 			ICEParameters{},
 			mediaSections,
 			ICEGatheringStateComplete,
-			&matchedBundle,
+			matchedBundle,
 			se.getSCTPMaxMessageSize(),
 			false,
 			false,
@@ -1279,6 +1306,7 @@ func TestPopulateSDP(t *testing.T) { //nolint:gocyclo,cyclop,maintidx
 
 		offerSdp, err := populateSDP(
 			d,
+			false,
 			[]DTLSFingerprint{},
 			se.sdpMediaLevelFingerprints,
 			se.candidates.ICELite,
@@ -1316,6 +1344,7 @@ func TestPopulateSDP(t *testing.T) { //nolint:gocyclo,cyclop,maintidx
 		d := &sdp.SessionDescription{}
 		offerSdp, err := populateSDP(
 			d,
+			false,
 			[]DTLSFingerprint{},
 			se.sdpMediaLevelFingerprints,
 			se.candidates.ICELite,
@@ -1357,6 +1386,7 @@ func TestPopulateSDP(t *testing.T) { //nolint:gocyclo,cyclop,maintidx
 		d := &sdp.SessionDescription{}
 		offerSdp, err := populateSDP(
 			d,
+			false,
 			[]DTLSFingerprint{},
 			se.sdpMediaLevelFingerprints,
 			se.candidates.ICELite,
@@ -1380,119 +1410,64 @@ func TestPopulateSDP(t *testing.T) { //nolint:gocyclo,cyclop,maintidx
 }
 
 func TestGetRIDs(t *testing.T) {
-	mediaDescr := []*sdp.MediaDescription{
-		{
-			MediaName: sdp.MediaName{
-				Media: "video",
-			},
-			Attributes: []sdp.Attribute{
-				{Key: "sendonly"},
+	for _, tc := range []struct{ simulcast, order, paused string }{
+		{"", "f q h u v x", ""},                     // No simulcast list preserves RID declaration order.
+		{"send h;", "h f q u v x", ""},              // A trailing separator leaves unlisted RIDs in their original order.
+		{"send h;;~f", "h f q u v x", "f"},          // An empty stream entry does not hide a later paused RID.
+		{"send ", "f q h u v x", ""},                // An empty list after the direction preserves declaration order.
+		{"send", "f q h u v x", ""},                 // A direction without a list is safe to parse.
+		{"recv ~x", "x f q h u v", "x"},             // A recv-only list still controls ordering and pause state.
+		{"send h;~f;q", "h f q u v x", "f"},         // Send order overrides declaration order and preserves pause state.
+		{"send h,~f;q", "h f q u v x", "f"},         // Comma-separated alternatives are ordered and can be paused.
+		{"recv x send h;~f;q", "h f q u v x", "f"},  // Prefer send even when recv appears first.
+		{"send h;~f;q recv ~x", "h f q u v x", "f"}, // A later recv list cannot override send ordering or pause state.
+		{"send h;~f;h;q;~f", "h f q u v x", "f"},    // Repeated RIDs keep their first position without duplicating entries.
+	} {
+		t.Run(tc.simulcast, func(t *testing.T) {
+			media := &sdp.MediaDescription{Attributes: []sdp.Attribute{
 				{Key: sdpAttributeRid, Value: "f send pt=97;max-width=1280;max-height=720"},
-			},
-		},
-	}
-
-	rids := getRids(mediaDescr[0])
-
-	assert.NotEmpty(t, rids, "Rid mapping should be present")
-	found := false
-	for _, rid := range rids {
-		if rid.id == "f" {
-			found = true
-
-			break
-		}
-	}
-	if !found {
-		assert.Fail(t, "rid values should contain 'f'")
-	}
-}
-
-// TestGetRIDs_EmptySimulcastTokens verifies that getRids does not panic when the
-// a=simulcast: attribute contains empty tokens (trailing ";", ";;", or a
-// direction-only value with no rid list).
-func TestGetRIDs_EmptySimulcastTokens(t *testing.T) {
-	cases := []struct {
-		name          string
-		simulcastVal  string
-		ridAttrs      []string
-		wantPausedIDs []string
-	}{
-		{
-			name:         "trailing semicolon",
-			simulcastVal: "send 1;",
-			ridAttrs:     []string{"1 send", "2 send"},
-		},
-		{
-			name:          "double semicolon",
-			simulcastVal:  "send 1;;~2",
-			ridAttrs:      []string{"1 send", "2 send"},
-			wantPausedIDs: []string{"2"},
-		},
-		{
-			name:         "empty rid list after direction",
-			simulcastVal: "send ",
-			ridAttrs:     []string{"1 send"},
-		},
-		{
-			name:         "direction only no space",
-			simulcastVal: "send",
-			ridAttrs:     []string{"1 send"},
-		},
-	}
-
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			attrs := []sdp.Attribute{
-				{Key: sdpAttributeSimulcast, Value: tc.simulcastVal},
-			}
-			for _, v := range tc.ridAttrs {
-				attrs = append(attrs, sdp.Attribute{Key: sdpAttributeRid, Value: v})
-			}
-			media := &sdp.MediaDescription{
-				MediaName:  sdp.MediaName{Media: "video"},
-				Attributes: attrs,
-			}
-
-			// Must not panic.
+				{Key: sdpAttributeRid, Value: "q send"},
+				{Key: sdpAttributeRid, Value: "h send"},
+				{Key: sdpAttributeRid, Value: "u send"},
+				{Key: sdpAttributeRid, Value: "v send"},
+				{Key: sdpAttributeRid, Value: "x recv"},
+				{Key: sdpAttributeSimulcast, Value: tc.simulcast},
+			}}
 			rids := getRids(media)
-
-			for _, pausedID := range tc.wantPausedIDs {
-				found := false
-				for _, rid := range rids {
-					if rid.id == pausedID {
-						assert.True(t, rid.paused, "rid %q should be paused", pausedID)
-						found = true
-
-						break
-					}
-				}
-				assert.True(t, found, "rid %q not found in result", pausedID)
+			want := strings.Fields(tc.order)
+			require.Len(t, rids, len(want))
+			for i, rid := range rids {
+				assert.Equal(t, want[i], rid.id)
+				assert.Equal(t, tc.paused == rid.id, rid.paused, "rid %q", rid.id)
 			}
 		})
 	}
 }
 
 func TestCodecsFromMediaDescription(t *testing.T) {
-	t.Run("Codec Only", func(t *testing.T) {
-		codecs, err := codecsFromMediaDescription(&sdp.MediaDescription{
-			MediaName: sdp.MediaName{
-				Media:   "audio",
-				Formats: []string{"111"},
-			},
-			Attributes: []sdp.Attribute{
-				{Key: "rtpmap", Value: "111 opus/48000/2"},
-			},
-		})
+	for _, testCase := range []struct {
+		media, rtpmap string
+		channels      uint16
+	}{
+		{"audio", "opus/48000/2", 2},
+		{"audio", "G722/8000", 1},
+		{"audio", "OpUs/48000", 2},
+		{"audio", "L16/44100/2", 2},
+		{"video", "VP8/90000", 0},
+		{"audio", "G722/8000/0", 0},
+		{"audio", "G722/8000/invalid", 0},
+	} {
+		t.Run(testCase.rtpmap, func(t *testing.T) {
+			codecs, err := codecsFromMediaDescription(&sdp.MediaDescription{
+				MediaName:  sdp.MediaName{Media: testCase.media, Formats: []string{"111"}},
+				Attributes: []sdp.Attribute{{Key: "rtpmap", Value: "111 " + testCase.rtpmap}},
+			})
 
-		assert.Equal(t, codecs, []RTPCodecParameters{
-			{
-				RTPCodecCapability: RTPCodecCapability{MimeTypeOpus, 48000, 2, "", []RTCPFeedback{}},
-				PayloadType:        111,
-			},
+			require.NoError(t, err)
+			require.Len(t, codecs, 1)
+			assert.Equal(t, testCase.channels, codecs[0].Channels)
 		})
-		assert.NoError(t, err)
-	})
+	}
 
 	t.Run("Codec with fmtp/rtcp-fb", func(t *testing.T) {
 		codecs, err := codecsFromMediaDescription(&sdp.MediaDescription{
@@ -1510,37 +1485,13 @@ func TestCodecsFromMediaDescription(t *testing.T) {
 			},
 		})
 
-		assert.Equal(t, codecs, []RTPCodecParameters{
-			{
-				RTPCodecCapability: RTPCodecCapability{
-					MimeTypeOpus,
-					48000,
-					2,
-					"minptime=10;useinbandfec=1",
-					[]RTCPFeedback{
-						{"goog-remb", ""},
-						{"ccm", "fir"},
-						{"nack", ""},
-					},
-				},
-				PayloadType: 111,
-			},
-		})
+		assert.Equal(t, codecs, []RTPCodecParameters{{RTPCodecCapability: RTPCodecCapability{MimeTypeOpus, 48000, 2, "minptime=10;useinbandfec=1", []RTCPFeedback{{"goog-remb", ""}, {"ccm", "fir"}, {"nack", ""}}}, PayloadType: 111}})
 		assert.NoError(t, err)
 	})
 }
 
 func TestRtpExtensionsFromMediaDescription(t *testing.T) {
-	extensions, err := rtpExtensionsFromMediaDescription(&sdp.MediaDescription{
-		MediaName: sdp.MediaName{
-			Media:   "audio",
-			Formats: []string{"111"},
-		},
-		Attributes: []sdp.Attribute{
-			{Key: "extmap", Value: "1 " + sdp.ABSSendTimeURI},
-			{Key: "extmap", Value: "3 " + sdp.SDESMidURI},
-		},
-	})
+	extensions, err := rtpExtensionsFromMediaDescription(&sdp.MediaDescription{MediaName: sdp.MediaName{Media: "audio", Formats: []string{"111"}}, Attributes: []sdp.Attribute{{Key: "extmap", Value: "1 " + sdp.ABSSendTimeURI}, {Key: "extmap", Value: "3 " + sdp.SDESMidURI}}})
 
 	assert.NoError(t, err)
 	assert.Equal(t, extensions[sdp.ABSSendTimeURI], 1)
@@ -1664,37 +1615,10 @@ a=sendrecv
 			}
 
 			me := &MediaEngine{}
-			assert.NoError(t, me.RegisterCodec(RTPCodecParameters{
-				RTPCodecCapability: RTPCodecCapability{
-					MimeType:     MimeTypeOpus,
-					ClockRate:    90000,
-					Channels:     0,
-					SDPFmtpLine:  "",
-					RTCPFeedback: nil,
-				},
-				PayloadType: 101,
-			}, RTPCodecTypeAudio))
-			assert.NoError(t, me.RegisterCodec(RTPCodecParameters{
-				RTPCodecCapability: RTPCodecCapability{
-					MimeType:     MimeTypeVP8,
-					ClockRate:    90000,
-					Channels:     0,
-					SDPFmtpLine:  "",
-					RTCPFeedback: nil,
-				},
-				PayloadType: 96,
-			}, RTPCodecTypeVideo))
+			assert.NoError(t, me.RegisterCodec(RTPCodecParameters{RTPCodecCapability: RTPCodecCapability{MimeType: MimeTypeOpus, ClockRate: 90000, Channels: 0, SDPFmtpLine: "", RTCPFeedback: nil}, PayloadType: 101}, RTPCodecTypeAudio))
+			assert.NoError(t, me.RegisterCodec(RTPCodecParameters{RTPCodecCapability: RTPCodecCapability{MimeType: MimeTypeVP8, ClockRate: 90000, Channels: 0, SDPFmtpLine: "", RTCPFeedback: nil}, PayloadType: 96}, RTPCodecTypeVideo))
 			if testCase.enableRTXInMediaEngine {
-				assert.NoError(t, me.RegisterCodec(RTPCodecParameters{
-					RTPCodecCapability: RTPCodecCapability{
-						MimeType:     MimeTypeRTX,
-						ClockRate:    90000,
-						Channels:     0,
-						SDPFmtpLine:  "apt=96",
-						RTCPFeedback: nil,
-					},
-					PayloadType: 97,
-				}, RTPCodecTypeVideo))
+				assert.NoError(t, me.RegisterCodec(RTPCodecParameters{RTPCodecCapability: RTPCodecCapability{MimeType: MimeTypeRTX, ClockRate: 90000, Channels: 0, SDPFmtpLine: "apt=96", RTCPFeedback: nil}, PayloadType: 97}, RTPCodecTypeVideo))
 			}
 
 			peerConnection, err := NewAPI(WithMediaEngine(me)).NewPeerConnection(Configuration{})
@@ -1717,9 +1641,7 @@ a=sendrecv
 				assert.NoError(t, err)
 				checkRTXSupport(offer.parsed)
 			} else {
-				assert.NoError(t, peerConnection.SetRemoteDescription(SessionDescription{
-					Type: SDPTypeOffer, SDP: testCase.remoteOffer,
-				}))
+				assert.NoError(t, peerConnection.SetRemoteDescription(SessionDescription{Type: SDPTypeOffer, SDP: testCase.remoteOffer}))
 				answer, err := peerConnection.CreateAnswer(nil)
 				assert.NoError(t, err)
 				checkRTXSupport(answer.parsed)
@@ -1734,7 +1656,13 @@ func TestSctpInit(t *testing.T) {
 	t.Run("base64-encoded sctp-init is valid", func(t *testing.T) {
 		s := &sdp.SessionDescription{
 			MediaDescriptions: []*sdp.MediaDescription{
-				{Attributes: []sdp.Attribute{{Key: "sctp-init", Value: "Q29va2llTW9uc3Rlcg=="}}},
+				{
+					MediaName: sdp.MediaName{
+						Protos:  []string{"UDP", "DTLS", "SCTP"},
+						Formats: []string{"webrtc-datachannel"},
+					},
+					Attributes: []sdp.Attribute{{Key: "sctp-init", Value: "Q29va2llTW9uc3Rlcg=="}},
+				},
 			},
 		}
 		init, err := getSctpInit(s.MediaDescriptions[0])
@@ -1744,12 +1672,37 @@ func TestSctpInit(t *testing.T) {
 	t.Run("Not base64-encoded sctp-init is rejected", func(t *testing.T) {
 		s := &sdp.SessionDescription{
 			MediaDescriptions: []*sdp.MediaDescription{
-				{Attributes: []sdp.Attribute{{Key: "sctp-init", Value: "*"}}},
+				{
+					MediaName: sdp.MediaName{
+						Protos:  []string{"UDP", "DTLS", "SCTP"},
+						Formats: []string{"webrtc-datachannel"},
+					},
+					Attributes: []sdp.Attribute{{Key: "sctp-init", Value: "*"}},
+				},
 			},
 		}
 		_, err := getSctpInit(s.MediaDescriptions[0])
 		var corruptInputError base64.CorruptInputError
 		assert.ErrorAs(t, err, &corruptInputError)
+	})
+	t.Run("sctp-init is ignored with sctpmap", func(t *testing.T) {
+		sessionDesc := &sdp.SessionDescription{
+			MediaDescriptions: []*sdp.MediaDescription{
+				{
+					MediaName: sdp.MediaName{
+						Protos:  []string{"DTLS", "SCTP"},
+						Formats: []string{"5000"},
+					},
+					Attributes: []sdp.Attribute{
+						{Key: "sctpmap", Value: "5000 webrtc-datachannel 1024"},
+						{Key: "sctp-init", Value: "Q29va2llTW9uc3Rlcg=="},
+					},
+				},
+			},
+		}
+		init, err := getSctpInit(sessionDesc.MediaDescriptions[0])
+		assert.NoError(t, err)
+		assert.Nil(t, init)
 	})
 }
 
@@ -1763,4 +1716,183 @@ func TestGetPeerDirection(t *testing.T) {
 
 	media.WithPropertyAttribute("recvonly")
 	assert.Equal(t, RTPTransceiverDirectionRecvonly, getPeerDirection(media, session))
+}
+
+func TestPopulateLocalCandidatesDoesNotMutateSDP(t *testing.T) {
+	gatherer, err := NewAPI().NewICEGatherer(ICEGatherOptions{})
+	require.NoError(t, err)
+	t.Cleanup(func() { assert.NoError(t, gatherer.Close()) })
+	_, err = gatherer.GetLocalCandidates()
+	require.NoError(t, err)
+
+	attributes := make([]sdp.Attribute, 1, 8)
+	attributes[0] = sdp.Attribute{Key: sdp.AttrKeyMID, Value: "0"}
+	original := &SessionDescription{
+		Type: SDPTypeAnswer,
+		parsed: &sdp.SessionDescription{
+			MediaDescriptions: []*sdp.MediaDescription{{
+				MediaName:  sdp.MediaName{Port: sdp.RangedPort{Value: 9}},
+				Attributes: attributes,
+			}},
+		},
+	}
+	before, err := original.parsed.Marshal()
+	require.NoError(t, err)
+	original.SDP = string(before)
+	backing := slices.Clone(attributes[:cap(attributes)])
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		for range 100 {
+			selectCandidateMediaSection(original.parsed)
+		}
+	}()
+	for range 100 {
+		populated := populateLocalCandidates(original, nil, nil, gatherer, ICEGatheringStateComplete)
+		require.NotSame(t, original, populated)
+		assert.Contains(t, populated.SDP, "a=end-of-candidates")
+		assert.Equal(t, SDPTypeAnswer, populated.Type)
+		_, complete := populated.parsed.MediaDescriptions[0].Attribute("end-of-candidates")
+		assert.True(t, complete)
+	}
+	<-done
+
+	after, err := original.parsed.Marshal()
+	require.NoError(t, err)
+	assert.Equal(t, before, after)
+	assert.Equal(t, backing, attributes[:cap(attributes)])
+}
+
+func TestPopulateSDPCandidatePlacement(t *testing.T) {
+	const dataMid = "data"
+
+	audioBundle, reorderedBundle, emptyBundle := "audio data", "audio video data", ""
+	for _, testCase := range []struct {
+		name          string
+		initialOffer  bool
+		rejectVideo   bool
+		inactiveVideo bool
+		dataOnly      bool
+		bundle        *string
+		candidates    []bool
+	}{
+		{name: "initial offer", initialOffer: true, candidates: []bool{true, true, true}},
+		{name: SDPTypeAnswer.String(), candidates: []bool{true, false, false}},
+		{name: "video codec rejected", rejectVideo: true, candidates: []bool{false, true, false}},
+		{name: "video excluded from bundle", bundle: &audioBundle, candidates: []bool{false, true, false}},
+		{name: "bundle order differs from media order", bundle: &reorderedBundle, candidates: []bool{false, true, false}},
+		{name: "inactive video remains eligible", inactiveVideo: true, candidates: []bool{true, false, false}},
+		{name: "data only", dataOnly: true, candidates: []bool{true}},
+		{name: "all sections disabled", bundle: &emptyBundle, candidates: []bool{false, false, false}},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			engine := &MediaEngine{}
+			require.NoError(t, engine.RegisterCodec(RTPCodecParameters{
+				RTPCodecCapability: RTPCodecCapability{MimeType: MimeTypeOpus, ClockRate: 48000, Channels: 2},
+				PayloadType:        111,
+			}, RTPCodecTypeAudio))
+			if !testCase.rejectVideo {
+				require.NoError(t, engine.RegisterCodec(RTPCodecParameters{
+					RTPCodecCapability: RTPCodecCapability{MimeType: MimeTypeVP8, ClockRate: 90000},
+					PayloadType:        96,
+				}, RTPCodecTypeVideo))
+			}
+			api := NewAPI(WithMediaEngine(engine))
+			video := &RTPTransceiver{kind: RTPCodecTypeVideo, api: api}
+			video.setDirection(RTPTransceiverDirectionRecvonly)
+			if testCase.inactiveVideo {
+				video.setDirection(RTPTransceiverDirectionInactive)
+			}
+			audio := &RTPTransceiver{kind: RTPCodecTypeAudio, api: api}
+			audio.setDirection(RTPTransceiverDirectionRecvonly)
+			sections := []mediaSection{
+				{id: "video", transceivers: []*RTPTransceiver{video}},
+				{id: "audio", transceivers: []*RTPTransceiver{audio}},
+				{id: dataMid, data: true},
+			}
+			if testCase.dataOnly {
+				sections = sections[2:]
+			}
+			candidates := []ICECandidate{{
+				Foundation: "1", Priority: 1, Address: "192.0.2.1", Protocol: ICEProtocolUDP,
+				Port: 1234, Typ: ICECandidateTypeHost, Component: 1,
+			}}
+			var matched *sdp.SessionDescription
+			if testCase.bundle != nil {
+				matched = (&sdp.SessionDescription{}).WithValueAttribute(sdp.AttrKeyGroup, "BUNDLE "+*testCase.bundle)
+			}
+			descr, err := populateSDP(
+				&sdp.SessionDescription{},
+				testCase.initialOffer,
+				nil,
+				false,
+				false,
+				false,
+				engine,
+				sdp.ConnectionRoleActive,
+				candidates,
+				ICEParameters{},
+				sections,
+				ICEGatheringStateComplete,
+				matched,
+				0,
+				false,
+				false,
+			)
+			require.NoError(t, err)
+			require.Len(t, descr.MediaDescriptions, len(testCase.candidates))
+			for index, expected := range testCase.candidates {
+				media := descr.MediaDescriptions[index]
+				_, found := media.Attribute("candidate")
+				assert.Equal(t, expected, found, "candidates on media section %d", index)
+				_, found = media.Attribute("end-of-candidates")
+				assert.Equal(t, expected, found, "end-of-candidates on media section %d", index)
+			}
+			if testCase.inactiveVideo {
+				_, inactive := descr.MediaDescriptions[0].Attribute("inactive")
+				assert.True(t, inactive)
+				assert.NotZero(t, descr.MediaDescriptions[0].MediaName.Port.Value)
+			}
+		})
+	}
+}
+
+func TestTrackDetailsFromSDPRejectedMedia(t *testing.T) {
+	for _, testCase := range []struct {
+		name       string
+		port       int
+		bundleOnly bool
+		wantTracks int
+	}{
+		{name: "accepted", port: 9, wantTracks: 1},
+		{name: "rejected", port: 0, wantTracks: 0},
+		{name: "bundle-only", port: 0, bundleOnly: true, wantTracks: 1},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			for _, metadata := range []sdp.Attribute{
+				{Key: sdp.AttrKeySSRC, Value: "1000"},
+				{Key: sdpAttributeRid, Value: "f send"},
+			} {
+				t.Run(metadata.Key, func(t *testing.T) {
+					media := &sdp.MediaDescription{
+						MediaName: sdp.MediaName{Media: "video", Port: sdp.RangedPort{Value: testCase.port}},
+						Attributes: []sdp.Attribute{
+							{Key: "mid", Value: "0"},
+							{Key: sdp.AttrKeySendOnly},
+							{Key: "msid", Value: "stream track"},
+							metadata,
+						},
+					}
+					if testCase.bundleOnly {
+						media.WithPropertyAttribute("bundle-only")
+					}
+					tracks := trackDetailsFromSDP(nil, &sdp.SessionDescription{
+						MediaDescriptions: []*sdp.MediaDescription{media},
+					})
+					require.Len(t, tracks, testCase.wantTracks)
+				})
+			}
+		})
+	}
 }

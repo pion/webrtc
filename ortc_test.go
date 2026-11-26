@@ -6,7 +6,7 @@
 package webrtc
 
 import (
-	"github.com/pion/webrtc/v5/internal/util"
+	"errors"
 )
 
 type testORTCStack struct {
@@ -98,7 +98,7 @@ func (s *testORTCStack) close() error {
 		closeErrs = append(closeErrs, err)
 	}
 
-	return util.FlattenErrs(closeErrs)
+	return errors.Join(closeErrs...)
 }
 
 type testORTCSignal struct {
@@ -177,7 +177,5 @@ func signalORTCPair(stackA *testORTCStack, stackB *testORTCStack) error {
 	errA := <-a
 	errB := <-b
 
-	closeErrs := []error{errA, errB}
-
-	return util.FlattenErrs(closeErrs)
+	return errors.Join(errA, errB)
 }

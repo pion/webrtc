@@ -120,7 +120,7 @@ func (t *SignalingState) Set(state SignalingState) {
 	atomic.StoreInt32((*int32)(t), int32(state))
 }
 
-//nolint:gocognit,cyclop
+//nolint:cyclop
 func checkNextSignalingState(cur, next SignalingState, op stateChangeOp, sdpType SDPType) (SignalingState, error) {
 	// Special case for rollbacks
 	if sdpType == SDPTypeRollback && cur == SignalingStateStable {

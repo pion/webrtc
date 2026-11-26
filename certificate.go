@@ -25,7 +25,6 @@ import (
 type Certificate struct {
 	privateKey crypto.PrivateKey
 	x509Cert   *x509.Certificate
-	statsID    string
 }
 
 // NewCertificate generates a new x509 compliant Certificate to be used
@@ -62,37 +61,31 @@ func NewCertificate(key crypto.PrivateKey, tpl x509.Certificate) (*Certificate, 
 	return &Certificate{
 		privateKey: key,
 		x509Cert:   cert,
-		statsID:    fmt.Sprintf("certificate-%d", time.Now().UnixNano()),
 	}, nil
 }
 
 // Equals determines if two certificates are identical by comparing both the
 // secretKeys and x509Certificates.
 func (c Certificate) Equals(cert Certificate) bool {
-	switch cSK := c.privateKey.(type) {
-	case *rsa.PrivateKey:
-		if oSK, ok := cert.privateKey.(*rsa.PrivateKey); ok {
-			if cSK.N.Cmp(oSK.N) != 0 {
-				return false
-			}
-
-			return c.x509Cert.Equal(cert.x509Cert)
-		}
-
-		return false
-	case *ecdsa.PrivateKey:
-		if oSK, ok := cert.privateKey.(*ecdsa.PrivateKey); ok {
-			if cSK.X.Cmp(oSK.X) != 0 || cSK.Y.Cmp(oSK.Y) != 0 {
-				return false
-			}
-
-			return c.x509Cert.Equal(cert.x509Cert)
-		}
-
-		return false
-	default:
+	if c.x509Cert == nil || cert.x509Cert == nil {
 		return false
 	}
+
+	cSigner, ok := c.privateKey.(crypto.Signer)
+	if !ok {
+		return false
+	}
+	oSigner, ok := cert.privateKey.(crypto.Signer)
+	if !ok {
+		return false
+	}
+
+	cPub, ok := cSigner.Public().(interface{ Equal(crypto.PublicKey) bool })
+	if !ok || !cPub.Equal(oSigner.Public()) {
+		return false
+	}
+
+	return c.x509Cert.Equal(cert.x509Cert)
 }
 
 // Expires returns the timestamp after which this certificate is no longer valid.
@@ -158,32 +151,26 @@ func GenerateCertificate(secretKey crypto.PrivateKey) (*Certificate, error) {
 //
 // This can be used if you want to share a certificate across multiple PeerConnections.
 func CertificateFromX509(privateKey crypto.PrivateKey, certificate *x509.Certificate) Certificate {
-	return Certificate{privateKey, certificate, fmt.Sprintf("certificate-%d", time.Now().UnixNano())}
+	return Certificate{privateKey, certificate}
 }
 
-func (c Certificate) collectStats(report *statsReportCollector) error {
-	report.Collecting()
-
-	fingerPrintAlgo, err := c.GetFingerprints()
+func newCertificateStats(cert *x509.Certificate) (CertificateStats, error) {
+	algorithm, err := fingerprint.StringFromHash(crypto.SHA256)
 	if err != nil {
-		return err
+		return CertificateStats{}, err
+	}
+	fp, err := fingerprint.Fingerprint(cert, crypto.SHA256)
+	if err != nil {
+		return CertificateStats{}, err
 	}
 
-	base64Certificate := base64.RawURLEncoding.EncodeToString(c.x509Cert.Raw)
-
-	stats := CertificateStats{
-		Timestamp:            statsTimestampFrom(time.Now()),
+	return CertificateStats{
 		Type:                 StatsTypeCertificate,
-		ID:                   c.statsID,
-		Fingerprint:          fingerPrintAlgo[0].Value,
-		FingerprintAlgorithm: fingerPrintAlgo[0].Algorithm,
-		Base64Certificate:    base64Certificate,
-		IssuerCertificateID:  c.x509Cert.Issuer.String(),
-	}
-
-	report.Collect(stats.ID, stats)
-
-	return nil
+		ID:                   "certificate-" + fp,
+		Fingerprint:          fp,
+		FingerprintAlgorithm: algorithm,
+		Base64Certificate:    base64.StdEncoding.EncodeToString(cert.Raw),
+	}, nil
 }
 
 // CertificateFromPEM creates a fresh certificate based on a string containing

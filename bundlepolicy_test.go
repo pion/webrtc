@@ -21,11 +21,7 @@ func TestNewBundlePolicy(t *testing.T) {
 	}
 
 	for i, testCase := range testCases {
-		assert.Equal(t,
-			testCase.expectedPolicy,
-			newBundlePolicy(testCase.policyString),
-			"testCase: %d %v", i, testCase,
-		)
+		assert.Equal(t, testCase.expectedPolicy, newBundlePolicy(testCase.policyString), "testCase: %d %v", i, testCase)
 	}
 }
 
@@ -41,10 +37,6 @@ func TestBundlePolicy_String(t *testing.T) {
 	}
 
 	for i, testCase := range testCases {
-		assert.Equal(t,
-			testCase.expectedString,
-			testCase.policy.String(),
-			"testCase: %d %v", i, testCase,
-		)
+		assert.Equal(t, testCase.expectedString, testCase.policy.String(), "testCase: %d %v", i, testCase)
 	}
 }

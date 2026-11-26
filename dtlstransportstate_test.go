@@ -23,11 +23,7 @@ func TestNewDTLSTransportState(t *testing.T) {
 	}
 
 	for i, testCase := range testCases {
-		assert.Equal(t,
-			testCase.expectedState,
-			newDTLSTransportState(testCase.stateString),
-			"testCase: %d %v", i, testCase,
-		)
+		assert.Equal(t, testCase.expectedState, newDTLSTransportState(testCase.stateString), "testCase: %d %v", i, testCase)
 	}
 }
 
@@ -45,10 +41,6 @@ func TestDTLSTransportState_String(t *testing.T) {
 	}
 
 	for i, testCase := range testCases {
-		assert.Equal(t,
-			testCase.expectedString,
-			testCase.state.String(),
-			"testCase: %d %v", i, testCase,
-		)
+		assert.Equal(t, testCase.expectedString, testCase.state.String(), "testCase: %d %v", i, testCase)
 	}
 }

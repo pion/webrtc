@@ -16,6 +16,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -30,7 +31,6 @@ import (
 	"github.com/pion/srtp/v3"
 	"github.com/pion/webrtc/v5/internal/detacheddtls"
 	"github.com/pion/webrtc/v5/internal/netconn"
-	"github.com/pion/webrtc/v5/internal/util"
 	"github.com/pion/webrtc/v5/pkg/rtcerr"
 )
 
@@ -41,16 +41,25 @@ import (
 type DTLSTransport struct {
 	lock sync.RWMutex
 
+	statsID               string
 	iceTransport          *ICETransport
 	certificates          []Certificate
 	remoteParameters      DTLSParameters
 	remoteCertificate     []byte
+	remoteCertificates    [][]byte
 	state                 DTLSTransportState
 	srtpProtectionProfile srtp.ProtectionProfile
+	tlsVersion            string
+	dtlsCipher            string
+	srtpCipher            string
 	localCryptexMode      srtp.CryptexMode // outbound (send) Cryptex mode
 	remoteCryptexMode     srtp.CryptexMode // inbound (receive) Cryptex mode
 
-	onStateChangeHandler func(DTLSTransportState)
+	localCertificateStats  CertificateStats
+	remoteCertificateStats []CertificateStats
+
+	onStateChangeHandler         func(DTLSTransportState)
+	internalOnStateChangeHandler func(DTLSTransportState)
 
 	conn     *detacheddtls.Conn
 	dtlsConn *dtls.DetachedConn
@@ -59,6 +68,8 @@ type DTLSTransport struct {
 	srtpEndpoint, srtcpEndpoint *netconn.Conn
 	simulcastStreams            []simulcastStreamPair
 	srtpReady                   chan struct{}
+	srtpWanted                  bool // media was negotiated, guarded by lock
+	srtpCanStart                bool // DTLS is connected, guarded by lock
 
 	api *API
 	log logging.LeveledLogger
@@ -86,6 +97,8 @@ type srtpRTPReader struct {
 func (r *srtpRTPReader) Read(in []byte, a interceptor.Attributes) (int, interceptor.Attributes, error) {
 	stream, err := r.readStream.NextStream()
 	if err != nil {
+		wakeSRTPReadersOnEOF(r.readStream, err)
+
 		return 0, a, err
 	}
 	if repair := r.repair.Load(); repair != nil && stream == repair.readStream {
@@ -95,11 +108,20 @@ func (r *srtpRTPReader) Read(in []byte, a interceptor.Attributes) (int, intercep
 	return r.interceptor.Read(in, a)
 }
 
+func wakeSRTPReadersOnEOF(stream *srtp.ReadStreamSRTP, err error) {
+	if errors.Is(err, io.EOF) {
+		// A closed SRTP stream can have multiple readers. Expiring its deadline
+		// wakes readers still blocked on it.
+		_ = stream.SetReadDeadline(time.Now())
+	}
+}
+
 // NewDTLSTransport creates a new DTLSTransport.
 // This constructor is part of the ORTC API. It is not
 // meant to be used together with the basic WebRTC API.
 func (api *API) NewDTLSTransport(transport *ICETransport, certificates []Certificate) (*DTLSTransport, error) {
 	trans := &DTLSTransport{
+		statsID:      "DTLSTransport-" + rand.Text(),
 		iceTransport: transport,
 		api:          api,
 		state:        DTLSTransportStateNew,
@@ -139,12 +161,21 @@ func (t *DTLSTransport) ICETransport() *ICETransport {
 	return t.iceTransport
 }
 
-// onStateChange requires the caller holds the lock.
+// onStateChange notifies handlers after the state has been published.
 func (t *DTLSTransport) onStateChange(state DTLSTransportState) {
-	t.state = state
-	handler := t.onStateChangeHandler
+	t.lock.RLock()
+	current := t.state
+	handler, internalHandler := t.onStateChangeHandler, t.internalOnStateChangeHandler
+	t.lock.RUnlock()
+
+	if current != state {
+		return
+	}
 	if handler != nil {
 		handler(state)
+	}
+	if internalHandler != nil && t.State() == state {
+		internalHandler(state)
 	}
 }
 
@@ -167,6 +198,9 @@ func (t *DTLSTransport) State() DTLSTransportState {
 // WriteRTCP sends a user provided RTCP packet to the connected peer. If no peer is connected the
 // packet is discarded.
 func (t *DTLSTransport) WriteRTCP(pkts []rtcp.Packet) (int, error) {
+	if err := t.wantSRTP(); err != nil {
+		return 0, err
+	}
 	raw, err := rtcp.Marshal(pkts)
 	if err != nil {
 		return 0, err
@@ -217,8 +251,32 @@ func (t *DTLSTransport) GetRemoteCertificate() []byte {
 	return t.remoteCertificate
 }
 
+// wantSRTP starts the SRTP sessions now, or once DTLS connects. It is called
+// when a negotiation brings media.
+func (t *DTLSTransport) wantSRTP() error {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+	if t.srtpWanted {
+		return nil
+	}
+	t.srtpWanted = true
+	if !t.srtpCanStart {
+		return nil
+	}
+
+	if t.dtlsConn == nil {
+		return io.ErrClosedPipe
+	}
+	connState, ok := t.dtlsConn.ConnectionState()
+	if !ok {
+		return fmt.Errorf("%w: Failed to get DTLS ConnectionState", errDtlsKeyExtractionFailed)
+	}
+
+	return t.startSRTP(&connState)
+}
+
 // startSRTP requires the caller holds the lock.
-func (t *DTLSTransport) startSRTP() error { //nolint:cyclop
+func (t *DTLSTransport) startSRTP(connState *dtls.State) error { //nolint:cyclop
 	srtpConfig := &srtp.Config{
 		Profile:       t.srtpProtectionProfile,
 		BufferFactory: t.api.settingEngine.BufferFactory,
@@ -263,13 +321,7 @@ func (t *DTLSTransport) startSRTP() error { //nolint:cyclop
 		)
 	}
 
-	connState, ok := t.dtlsConn.ConnectionState()
-	if !ok {
-		// nolint
-		return fmt.Errorf("%w: Failed to get DTLS ConnectionState", errDtlsKeyExtractionFailed)
-	}
-
-	err := srtpConfig.ExtractSessionKeysFromDTLS(&connState, t.roleLocked() == DTLSRoleClient)
+	err := srtpConfig.ExtractSessionKeysFromDTLS(connState, t.roleLocked() == DTLSRoleClient)
 	if err != nil {
 		// nolint
 		return fmt.Errorf("%w: %v", errDtlsKeyExtractionFailed, err)
@@ -389,10 +441,17 @@ func (t *DTLSTransport) start(
 		t.srtpEndpoint = t.iceTransport.newEndpoint(iceEndpointSRTP)
 		t.srtcpEndpoint = t.iceTransport.newEndpoint(iceEndpointSRTCP)
 	}
-	t.remoteParameters, t.remoteCertificate = remoteParameters, nil
+	t.remoteParameters, t.remoteCertificate, t.remoteCertificates = remoteParameters, nil, nil
+	t.remoteCertificateStats = nil
+	t.setLocalCertificateStats()
 	conn, cert, role := t.conn, t.certificates[0], t.roleLocked()
-	t.onStateChange(DTLSTransportStateConnecting)
+	t.state = DTLSTransportStateConnecting
 	t.lock.Unlock()
+
+	t.onStateChange(DTLSTransportStateConnecting)
+	if t.State() != DTLSTransportStateConnecting {
+		return io.ErrClosedPipe
+	}
 
 	ctx := context.Background()
 	if newContext != nil {
@@ -434,14 +493,23 @@ func (t *DTLSTransport) start(
 				RemoteAddr:       t.iceTransport.remoteAddr,
 				SetWriteDeadline: t.iceTransport.setWriteDeadline,
 			},
-			OnClose: func() {
+			OnClose: func(err error) {
 				go func() {
 					<-startFinished.Done()
 					t.lock.Lock()
-					defer t.lock.Unlock()
-					if t.state == DTLSTransportStateConnected {
-						t.onStateChange(DTLSTransportStateClosed)
+					if t.state != DTLSTransportStateConnected || t.conn != conn {
+						t.lock.Unlock()
+
+						return
 					}
+					state := DTLSTransportStateClosed
+					if err != nil && !errors.Is(err, dtls.ErrConnClosed) && !errors.Is(err, io.EOF) {
+						state = DTLSTransportStateFailed
+					}
+					t.state = state
+					t.lock.Unlock()
+
+					t.onStateChange(state)
 				}()
 			},
 		})
@@ -542,18 +610,23 @@ func (t *DTLSTransport) verifyPeerCertificateFunc() func([][]byte, [][]*x509.Cer
 
 		t.lock.Lock()
 		defer t.lock.Unlock()
-		t.remoteCertificate = rawCerts[0]
 
 		if t.api.settingEngine.disableCertificateFingerprintVerification {
+			t.remoteCertificate, t.remoteCertificates = rawCerts[0], rawCerts
+
 			return nil
 		}
 
-		parsedRemoteCert, err := x509.ParseCertificate(t.remoteCertificate)
+		parsedRemoteCert, err := x509.ParseCertificate(rawCerts[0])
 		if err != nil {
 			return err
 		}
+		if err = t.validateFingerPrint(parsedRemoteCert); err != nil {
+			return err
+		}
+		t.remoteCertificate, t.remoteCertificates = rawCerts[0], rawCerts
 
-		return t.validateFingerPrint(parsedRemoteCert)
+		return nil
 	}
 }
 
@@ -591,10 +664,18 @@ func (t *DTLSTransport) toDTLSServerOptions(sharedOpts []dtls.Option) []dtls.Ser
 		clientAuth = *t.api.settingEngine.dtls.clientAuth
 	}
 
+	// The HelloVerifyRequest cookie exchange only validates the remote
+	// address, which the ICE connectivity checks have already done when
+	// using a full ICE agent, so it is skipped by default in that case.
+	skipHelloVerify := !t.api.settingEngine.candidates.ICELite
+	if skip := t.api.settingEngine.dtls.insecureSkipHelloVerify; skip != nil {
+		skipHelloVerify = *skip
+	}
+
 	serverOpts = append(serverOpts,
 		dtls.WithClientAuth(clientAuth),
 		dtls.WithClientCAs(t.api.settingEngine.dtls.clientCAs),
-		dtls.WithInsecureSkipVerifyHello(t.api.settingEngine.dtls.insecureSkipHelloVerify),
+		dtls.WithInsecureSkipVerifyHello(skipHelloVerify),
 	)
 
 	if t.api.settingEngine.dtls.serverHelloMessageHook != nil {
@@ -634,31 +715,83 @@ func (t *DTLSTransport) completeStart(dtlsConn *dtls.DetachedConn) error {
 	srtpProtectionProfile, err := srtpProtectionProfileFromDTLSConn(dtlsConn)
 
 	t.lock.Lock()
-	defer t.lock.Unlock()
+	if t.state != DTLSTransportStateConnecting {
+		t.lock.Unlock()
 
-	if t.state == DTLSTransportStateClosed {
 		return io.ErrClosedPipe
 	}
+	connState, ok := dtlsConn.ConnectionState()
+	if !ok { // never fire in practice.
+		t.lock.Unlock()
+
+		return fmt.Errorf("%w: Failed to get DTLS ConnectionState", errDtlsKeyExtractionFailed)
+	}
+	t.tlsVersion = fmt.Sprintf("%04X", connState.NegotiatedVersion())
+	t.dtlsCipher = connState.CipherSuiteID.String()
+	t.srtpCipher = ""
+	if err == nil && len(t.remoteCertificate) == 0 {
+		err = errNoRemoteCertificate
+	}
 	if err != nil {
+		t.lock.Unlock()
+
 		return err
 	}
 	t.srtpProtectionProfile = srtpProtectionProfile
-	if err = t.startSRTP(); err != nil {
-		return err
+	t.srtpCipher = srtpProtectionProfile.String()
+	// Start media sessions only when needed, and refresh their keys on DTLS restart.
+	t.srtpCanStart = true
+	if t.srtpWanted {
+		if err = t.startSRTP(&connState); err != nil {
+			t.lock.Unlock()
+
+			return err
+		}
 	}
+	t.setRemoteCertificateStats()
+	t.state = DTLSTransportStateConnected
+	t.lock.Unlock()
 	t.onStateChange(DTLSTransportStateConnected)
 
 	return nil
 }
 
+// setLocalCertificateStats requires the caller holds the lock.
+func (t *DTLSTransport) setLocalCertificateStats() {
+	t.localCertificateStats, _ = newCertificateStats(t.certificates[0].x509Cert)
+}
+
+// setRemoteCertificateStats requires the caller holds the lock.
+func (t *DTLSTransport) setRemoteCertificateStats() {
+	issuerID := ""
+	for _, der := range slices.Backward(t.remoteCertificates) {
+		cert, err := x509.ParseCertificate(der)
+		if err != nil {
+			continue
+		}
+		remoteStats, err := newCertificateStats(cert)
+		if err != nil {
+			continue
+		}
+		remoteStats.IssuerCertificateID = issuerID
+		issuerID = remoteStats.ID
+		t.remoteCertificateStats = append(t.remoteCertificateStats, remoteStats)
+	}
+	slices.Reverse(t.remoteCertificateStats)
+}
+
 func (t *DTLSTransport) failStart(err error) error {
 	t.lock.Lock()
-	if t.state != DTLSTransportStateClosed {
-		t.onStateChange(DTLSTransportStateFailed)
-	}
 	conn := t.conn
 	t.conn, t.dtlsConn = nil, nil
+	notify := t.state != DTLSTransportStateClosed
+	if notify {
+		t.state = DTLSTransportStateFailed
+	}
 	t.lock.Unlock()
+	if notify {
+		t.onStateChange(DTLSTransportStateFailed)
+	}
 	if conn != nil {
 		_ = conn.Close()
 	}
@@ -696,7 +829,8 @@ func (t *DTLSTransport) Stop() error {
 	conn := t.conn
 	simulcastStreams := t.simulcastStreams
 	t.simulcastStreams = nil
-	t.onStateChange(DTLSTransportStateClosed)
+	notify := t.state != DTLSTransportStateClosed
+	t.state = DTLSTransportStateClosed
 	t.lock.Unlock()
 	if t.iceTransport != nil {
 		t.iceTransport.notifyConnectionChanged()
@@ -720,12 +854,15 @@ func (t *DTLSTransport) Stop() error {
 
 	if conn != nil {
 		// dtls connection may be closed on sctp close.
-		if err := conn.Close(); err != nil && !errors.Is(err, dtls.ErrConnClosed) {
+		if err := conn.Close(); !errors.Is(err, dtls.ErrConnClosed) {
 			closeErrs = append(closeErrs, err)
 		}
 	}
+	if notify {
+		t.onStateChange(DTLSTransportStateClosed)
+	}
 
-	return util.FlattenErrs(closeErrs)
+	return errors.Join(closeErrs...)
 }
 
 func (t *DTLSTransport) validateFingerPrint(remoteCert *x509.Certificate) error {
@@ -756,20 +893,41 @@ func (t *DTLSTransport) ensureICEConn() error {
 	return nil
 }
 
+// storeSimulcastStream keeps the streams so that Stop can close them.
+// It returns false if the transport has already stopped.
 func (t *DTLSTransport) storeSimulcastStream(
 	srtpReadStream *srtp.ReadStreamSRTP,
 	srtcpReadStream *srtp.ReadStreamSRTCP,
-) {
+) bool {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
+	if t.state == DTLSTransportStateClosed {
+		return false
+	}
+
 	t.simulcastStreams = append(t.simulcastStreams, simulcastStreamPair{srtpReadStream, srtcpReadStream})
+
+	return true
+}
+
+// removeSimulcastStream forgets the streams after the RTPReceiver that used them has closed them.
+func (t *DTLSTransport) removeSimulcastStream(srtpReadStream *srtp.ReadStreamSRTP) {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+
+	t.simulcastStreams = slices.DeleteFunc(t.simulcastStreams, func(pair simulcastStreamPair) bool {
+		return pair.srtp == srtpReadStream
+	})
 }
 
 func (t *DTLSTransport) streamsForSSRC(
 	ssrc SSRC,
-	streamInfo interceptor.StreamInfo,
+	streamInfo *interceptor.StreamInfo,
 ) (*streamsForSSRCResult, error) {
+	if err := t.wantSRTP(); err != nil {
+		return nil, err
+	}
 	srtpSession, err := t.getSRTPSession()
 	if err != nil {
 		return nil, err
@@ -780,16 +938,6 @@ func (t *DTLSTransport) streamsForSSRC(
 		return nil, err
 	}
 
-	rtpReader := &srtpRTPReader{readStream: rtpReadStream}
-	source := rtpReadStream.SourceReader()
-	rtpReader.interceptor = t.api.interceptor.BindRemoteStream(&streamInfo, interceptor.RTPReaderFunc(
-		func(in []byte, a interceptor.Attributes) (int, interceptor.Attributes, error) {
-			n, readErr := source.Read(in)
-
-			return n, a, readErr
-		},
-	))
-
 	srtcpSession, err := t.getSRTCPSession()
 	if err != nil {
 		return nil, err
@@ -799,6 +947,17 @@ func (t *DTLSTransport) streamsForSSRC(
 	if err != nil {
 		return nil, err
 	}
+
+	rtpReader := &srtpRTPReader{readStream: rtpReadStream}
+	source := rtpReadStream.SourceReader()
+	rtpReader.interceptor = t.api.interceptor.BindRemoteStream(streamInfo, interceptor.RTPReaderFunc(
+		func(in []byte, a interceptor.Attributes) (int, interceptor.Attributes, error) {
+			n, readErr := source.Read(in)
+			wakeSRTPReadersOnEOF(rtpReadStream, readErr)
+
+			return n, a, readErr
+		},
+	))
 
 	rtcpInterceptor := t.api.interceptor.BindRTCPReader(interceptor.RTCPReaderFunc(
 		func(in []byte, a interceptor.Attributes) (n int, attributes interceptor.Attributes, err error) {
@@ -881,4 +1040,61 @@ func (t *DTLSTransport) rtpHeaderEncryptionNegotiated() bool {
 	defer t.lock.RUnlock()
 
 	return t.localCryptexMode == srtp.CryptexModeEnabled || t.localCryptexMode == srtp.CryptexModeRequired
+}
+
+// Stats reports statistics for the DTLSTransport and its underlying ICETransport.
+func (t *DTLSTransport) Stats() TransportStats {
+	stats, _ := t.stats()
+
+	return stats
+}
+
+func (t *DTLSTransport) stats() (TransportStats, []CertificateStats) {
+	t.lock.RLock()
+	stats := TransportStats{
+		Timestamp:  statsTimestampNow(),
+		Type:       StatsTypeTransport,
+		ID:         t.statsID,
+		DTLSState:  t.state,
+		TLSVersion: t.tlsVersion,
+		DTLSCipher: t.dtlsCipher,
+		SRTPCipher: t.srtpCipher,
+	}
+	var certificateStats []CertificateStats
+	if t.localCertificateStats.ID != "" {
+		stats.LocalCertificateID = t.localCertificateStats.ID
+		certificateStats = append(certificateStats, t.localCertificateStats)
+	}
+	if len(t.remoteCertificateStats) > 0 {
+		stats.RemoteCertificateID = t.remoteCertificateStats[0].ID
+		certificateStats = append(certificateStats, t.remoteCertificateStats...)
+	}
+	iceTransport := t.iceTransport
+	t.lock.RUnlock()
+
+	for i := range certificateStats {
+		certificateStats[i].Timestamp = stats.Timestamp
+	}
+
+	if iceTransport != nil {
+		stats.ICERole = iceTransport.Role()
+		stats.ICEState = iceTransport.State()
+		stats.BytesSent, stats.BytesReceived = iceTransport.byteCounts()
+		if pair, err := iceTransport.GetSelectedCandidatePair(); err == nil && pair != nil {
+			stats.SelectedCandidatePairID = pair.statsID
+		}
+	}
+
+	return stats, certificateStats
+}
+
+func (t *DTLSTransport) collectStats(collector *statsReportCollector) {
+	collector.Collecting()
+	stats, certificateStats := t.stats()
+	collector.Collect(stats.ID, stats)
+
+	for _, certStats := range certificateStats {
+		collector.Collecting()
+		collector.Collect(certStats.ID, certStats)
+	}
 }

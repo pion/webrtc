@@ -211,6 +211,7 @@ var (
 
 	errICEConnectionNotStarted        = errors.New("ICE connection not started")
 	errICECandidateTypeUnknown        = errors.New("unknown candidate type")
+	errICECandidateInvalid            = errors.New("ICE candidate must not contain carriage returns or newlines")
 	errICEInvalidConvertCandidateType = errors.New(
 		"cannot convert ice.CandidateType into webrtc.ICECandidateType, invalid type",
 	)
@@ -231,7 +232,11 @@ var (
 	errPeerConnStateChangeInvalid                     = errors.New("invalid state change op")
 	errPeerConnStateChangeUnhandled                   = errors.New("unhandled state change op")
 	errPeerConnSDPTypeInvalidValueSetLocalDescription = errors.New("invalid SDP type supplied to SetLocalDescription()")
-	errPeerConnRemoteDescriptionWithoutMidValue       = errors.New(
+
+	errPeerConnRemoteOfferDTLSRoleConflict = errors.New(
+		"remote offer conflicts with the configured answering DTLS role",
+	)
+	errPeerConnRemoteDescriptionWithoutMidValue = errors.New(
 		"remoteDescription contained media section without mid value",
 	)
 	errPeerConnRemoteDescriptionDuplicateMid         = errors.New("remoteDescription contained duplicate mid value")
@@ -241,6 +246,7 @@ var (
 	errPeerConnSimulcastMidRTPExtensionRequired      = errors.New("mid RTP Extensions required for Simulcast")
 	errPeerConnSimulcastStreamIDRTPExtensionRequired = errors.New("stream id RTP Extensions required for Simulcast")
 	errPeerConnSimulcastIncomingSSRCFailed           = errors.New("incoming SSRC failed Simulcast probing")
+	errPeerConnSimulcastRidNotOffered                = errors.New("answer contains a simulcast rid that was not offered")
 	errPeerConnAddTransceiverFromKindOnlyAcceptsOne  = errors.New(
 		"AddTransceiverFromKind only accepts one RTPTransceiverInit",
 	)
@@ -265,6 +271,7 @@ var (
 	errRTPReceiverReceiveAlreadyCalled        = errors.New("Receive has already been called")
 	errRTPReceiverWithSSRCTrackStreamNotFound = errors.New("unable to find stream for Track with SSRC")
 	errRTPReceiverForRIDTrackStreamNotFound   = errors.New("no trackStreams found for RID")
+	errRTPReceiverForSSRCTrackStreamNotFound  = errors.New("no trackStreams found for SSRC")
 
 	errRTPSenderTrackNil             = errors.New("Track must not be nil")
 	errRTPSenderDTLSTransportNil     = errors.New("DTLSTransport must not be nil")

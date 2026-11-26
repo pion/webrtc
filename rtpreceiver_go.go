@@ -22,10 +22,12 @@ func (r *RTPReceiver) SetRTPParameters(params RTPParameters) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	for ndx, codec := range params.Codecs {
+	for ndx, codec := range params.Codecs[:min(len(params.Codecs), len(r.tracks))] {
 		currentTrack := r.tracks[ndx].track
 
-		r.tracks[ndx].streamInfo.RTPHeaderExtensions = headerExtensions
+		if info := r.tracks[ndx].streamInfo; info != nil {
+			info.RTPHeaderExtensions = headerExtensions
+		}
 
 		currentTrack.mu.Lock()
 		currentTrack.codec = codec

@@ -6,12 +6,14 @@
 package webrtc
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"sync"
 	"time"
 
 	"github.com/pion/interceptor"
+	"github.com/pion/interceptor/pkg/stats"
 	"github.com/pion/randutil"
 	"github.com/pion/rtcp"
 	"github.com/pion/rtp"
@@ -242,6 +244,11 @@ func (r *RTPSender) ReplaceTrack(track TrackLocal) error { //nolint:cyclop
 		return ErrRTPSenderNewTrackHasIncorrectEnvelope
 	}
 
+	// Stop only unbinds once, a track bound after it would never be released
+	if track != nil && r.hasStopped() {
+		return errRTPSenderStopped
+	}
+
 	var replacedTrack TrackLocal
 	var context *baseTrackLocalContext
 	for _, e := range r.trackEncodings {
@@ -279,9 +286,10 @@ func (r *RTPSender) ReplaceTrack(track TrackLocal) error { //nolint:cyclop
 		rtcpInterceptor: context.RTCPReader(),
 	})
 	if err != nil {
-		// Re-bind the original track
-		if _, reBindErr := replacedTrack.Bind(context); reBindErr != nil {
-			return reBindErr
+		if replacedTrack != nil {
+			if _, reBindErr := replacedTrack.Bind(context); reBindErr != nil {
+				return reBindErr
+			}
 		}
 
 		return err
@@ -307,6 +315,9 @@ func (r *RTPSender) Send(parameters RTPSendParameters) error {
 		return errRTPSenderSendAlreadyCalled
 	case r.trackEncodings[0].track == nil:
 		return errRTPSenderTrackRemoved
+	case r.hasStopped():
+		// Stop only unbinds once, a track bound after it would never be released
+		return errRTPSenderStopped
 	}
 
 	for idx := range r.trackEncodings {
@@ -409,7 +420,7 @@ func (r *RTPSender) Stop() error {
 		}
 	}
 
-	return util.FlattenErrs(errs)
+	return errors.Join(errs...)
 }
 
 // Read reads incoming RTCP for this RTPSender.
@@ -450,40 +461,89 @@ func (r *RTPSender) ReadSimulcast(b []byte, rid string) (n int, a interceptor.At
 
 // ReadSimulcastRTCP is a convenience method that wraps ReadSimulcast and unmarshal for you.
 func (r *RTPSender) ReadSimulcastRTCP(rid string) ([]rtcp.Packet, interceptor.Attributes, error) {
-	b := make([]byte, r.api.settingEngine.getReceiveMTU())
-	i, attributes, err := r.ReadSimulcast(b, rid)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	pkts, err := rtcp.Unmarshal(b[:i])
-
-	return pkts, attributes, err
+	return readRTCP(func(b []byte) (int, interceptor.Attributes, error) {
+		return r.ReadSimulcast(b, rid)
+	}, r.api.settingEngine.getReceiveMTU())
 }
 
 // SetReadDeadline sets the deadline for the Read operation.
 // Setting to zero means no deadline.
 func (r *RTPSender) SetReadDeadline(t time.Time) error {
-	if r.trackEncodings[0].srtpStream == nil {
+	r.mu.RLock()
+	stream := r.trackEncodings[0].srtpStream
+	r.mu.RUnlock()
+	if stream == nil {
 		return errRTPSenderSendNotCalled
 	}
 
-	return r.trackEncodings[0].srtpStream.SetReadDeadline(t)
+	return stream.SetReadDeadline(t)
 }
 
 // SetReadDeadlineSimulcast sets the max amount of time the RTCP stream for a given rid
 // will block before returning. 0 is forever.
 func (r *RTPSender) SetReadDeadlineSimulcast(deadline time.Time, rid string) error {
 	r.mu.RLock()
-	defer r.mu.RUnlock()
-
 	for _, t := range r.trackEncodings {
 		if t.track != nil && t.track.RID() == rid {
-			return t.srtpStream.SetReadDeadline(deadline)
+			stream := t.srtpStream
+			r.mu.RUnlock()
+
+			if stream == nil {
+				return errRTPSenderSendNotCalled
+			}
+
+			return stream.SetReadDeadline(deadline)
 		}
 	}
+	r.mu.RUnlock()
 
 	return fmt.Errorf("%w: %s", errRTPSenderNoTrackForRID, rid)
+}
+
+func (r *RTPSender) collectStats(collector *statsReportCollector, statsGetter stats.Getter) {
+	if statsGetter == nil || !r.hasSent() || r.hasStopped() {
+		return
+	}
+
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	mid := ""
+	if r.rtpTransceiver != nil {
+		mid = r.rtpTransceiver.Mid()
+	}
+	now := statsTimestampNow()
+	for _, trackEncoding := range r.trackEncodings {
+		if trackEncoding.track == nil || trackEncoding.context == nil {
+			continue
+		}
+
+		collector.Collecting()
+
+		outboundStats := OutboundRTPStreamStats{
+			Mid:         mid,
+			Rid:         trackEncoding.track.RID(),
+			Timestamp:   now,
+			Type:        StatsTypeOutboundRTP,
+			ID:          fmt.Sprintf("outbound-rtp-%d", uint32(trackEncoding.ssrc)),
+			SSRC:        trackEncoding.ssrc,
+			Kind:        r.kind.String(),
+			TransportID: r.transport.statsID,
+		}
+		if codecs := trackEncoding.context.params.Codecs; len(codecs) > 0 {
+			outboundStats.CodecID = codecs[0].statsID
+		}
+		if stats := statsGetter.Get(uint32(trackEncoding.ssrc)); stats != nil {
+			outboundStats.PacketsSent = stats.OutboundRTPStreamStats.PacketsSent
+			outboundStats.BytesSent = stats.OutboundRTPStreamStats.BytesSent
+			outboundStats.HeaderBytesSent = stats.OutboundRTPStreamStats.HeaderBytesSent
+			outboundStats.NACKCount = stats.OutboundRTPStreamStats.NACKCount
+			outboundStats.FIRCount = stats.OutboundRTPStreamStats.FIRCount
+			outboundStats.PLICount = stats.OutboundRTPStreamStats.PLICount
+		}
+
+		collector.Collect(outboundStats.ID, outboundStats)
+	}
 }
 
 // hasSent tells if data has been ever sent for this instance.

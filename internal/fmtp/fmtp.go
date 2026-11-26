@@ -8,27 +8,30 @@ import (
 	"strings"
 )
 
-func defaultClockRate(mimeType string) uint32 {
-	defaults := map[string]uint32{
-		"audio/opus": 48000,
-		"audio/pcmu": 8000,
-		"audio/pcma": 8000,
+// ClockRateOrDefault replaces an omitted (zero) clock rate with the codec's default.
+func ClockRateOrDefault(mimeType string, clockRate uint32) uint32 {
+	if clockRate != 0 {
+		return clockRate
 	}
-
-	if def, ok := defaults[strings.ToLower(mimeType)]; ok {
-		return def
+	switch {
+	case strings.EqualFold(mimeType, "audio/opus"):
+		return 48000
+	case strings.EqualFold(mimeType, "audio/pcmu"), strings.EqualFold(mimeType, "audio/pcma"):
+		return 8000
 	}
 
 	return 90000
 }
 
-func defaultChannels(mimeType string) uint16 {
-	defaults := map[string]uint16{
-		"audio/opus": 2,
-	}
-
-	if def, ok := defaults[strings.ToLower(mimeType)]; ok {
-		return def
+// DefaultChannels returns the channel count implied by an omitted encoding
+// parameter: RFC 8866 says one for audio, except Opus which RFC 7587 fixes
+// at two. Video has no channel count, so it returns zero.
+func DefaultChannels(mimeType string) uint16 {
+	switch {
+	case strings.EqualFold(mimeType, "audio/opus"):
+		return 2
+	case len(mimeType) >= 6 && strings.EqualFold(mimeType[:6], "audio/"):
+		return 1
 	}
 
 	return 0
@@ -55,14 +58,8 @@ func ClockRateEqual(mimeType string, valA, valB uint32) bool {
 	// Lots of users use formats without setting clock rate or channels.
 	// In this case, use default values.
 	// It would be better to remove this exception in a future major release.
-	if valA == 0 {
-		valA = defaultClockRate(mimeType)
-	}
-	if valB == 0 {
-		valB = defaultClockRate(mimeType)
-	}
 
-	return valA == valB
+	return ClockRateOrDefault(mimeType, valA) == ClockRateOrDefault(mimeType, valB)
 }
 
 // ChannelsEqual checks whether two channels are equal.
@@ -71,10 +68,10 @@ func ChannelsEqual(mimeType string, valA, valB uint16) bool {
 	// In this case, use default values.
 	// It would be better to remove this exception in a future major release.
 	if valA == 0 {
-		valA = defaultChannels(mimeType)
+		valA = DefaultChannels(mimeType)
 	}
 	if valB == 0 {
-		valB = defaultChannels(mimeType)
+		valB = DefaultChannels(mimeType)
 	}
 
 	// RFC8866: channel count "is OPTIONAL and may be omitted
@@ -128,21 +125,25 @@ func Parse(mimeType string, clockRate uint32, channels uint16, line string) FMTP
 	switch {
 	case strings.EqualFold(mimeType, "video/h264"):
 		fmtp = &h264FMTP{
+			clockRate:  clockRate,
 			parameters: parameters,
 		}
 
 	case strings.EqualFold(mimeType, "video/h265"):
 		fmtp = &h265FMTP{
+			clockRate:  clockRate,
 			parameters: parameters,
 		}
 
 	case strings.EqualFold(mimeType, "video/vp9"):
 		fmtp = &vp9FMTP{
+			clockRate:  clockRate,
 			parameters: parameters,
 		}
 
 	case strings.EqualFold(mimeType, "video/av1"):
 		fmtp = &av1FMTP{
+			clockRate:  clockRate,
 			parameters: parameters,
 		}
 
