@@ -300,3 +300,19 @@ func TestPeerConnection_GracefulCloseConcurrent(t *testing.T) {
 		})
 	}
 }
+
+func TestPeerConnection_Close_NoICEGatheringStateChange(t *testing.T) {
+	pc, err := NewPeerConnection(Configuration{})
+	assert.NoError(t, err)
+
+	var events []ICEGatheringState
+	pc.OnICEGatheringStateChange(func(state ICEGatheringState) {
+		events = append(events, state)
+	})
+
+	pc.iceGatherer.setState(ICEGathererStateGathering)
+	assert.NoError(t, pc.Close())
+	pc.iceGatherer.setState(ICEGathererStateComplete)
+
+	assert.Equal(t, []ICEGatheringState{ICEGatheringStateGathering}, events)
+}

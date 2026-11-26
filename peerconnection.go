@@ -496,6 +496,9 @@ func (pc *PeerConnection) OnICECandidate(f func(*ICECandidate)) {
 func (pc *PeerConnection) OnICEGatheringStateChange(f func(ICEGatheringState)) {
 	pc.iceGatherer.OnStateChange(
 		func(gathererState ICEGathererState) {
+			if pc.isClosed.Load() {
+				return
+			}
 			switch gathererState {
 			case ICEGathererStateGathering:
 				f(ICEGatheringStateGathering)
