@@ -8,10 +8,13 @@ package webrtc
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"net"
+	"slices"
 	"sync"
 	"time"
+	"weak"
 
 	"github.com/pion/datachannel"
 	"github.com/pion/logging"
@@ -20,6 +23,19 @@ import (
 )
 
 const sctpMaxChannels = uint16(65535)
+
+var errDataChannelIDInUse = errors.New("data channel ID is in use")
+
+type dataChannelStreamOwner struct {
+	reservedBy *DataChannel
+	// Once bound, ownership follows the SCTP stream, including detached channels.
+	// Keep reset streams eligible for collection even while the ID remains used.
+	stream weak.Pointer[sctp.Stream]
+}
+
+func (owner dataChannelStreamOwner) reserved() bool {
+	return owner.reservedBy != nil && owner.reservedBy.ReadyState() == DataChannelStateConnecting
+}
 
 func newSCTPTransportMetadata(metadata sctp.AssociationMetadata) SCTPTransportMetadata {
 	partialReliabilityMode := SCTPTransportPartialReliabilityModeNone
@@ -68,7 +84,7 @@ type SCTPTransport struct {
 
 	// DataChannels
 	dataChannels          []*DataChannel
-	dataChannelIDsUsed    map[uint16]struct{}
+	dataChannelIDsUsed    map[uint16]dataChannelStreamOwner
 	dataChannelsOpened    uint32
 	dataChannelsRequested uint32
 	dataChannelsAccepted  uint32
@@ -88,7 +104,7 @@ func (api *API) NewSCTPTransport(dtls *DTLSTransport) *SCTPTransport {
 		state:              SCTPTransportStateConnecting,
 		api:                api,
 		log:                api.settingEngine.LoggerFactory.NewLogger("ortc"),
-		dataChannelIDsUsed: make(map[uint16]struct{}),
+		dataChannelIDsUsed: make(map[uint16]dataChannelStreamOwner),
 	}
 
 	res.updateMaxChannels()
@@ -190,7 +206,7 @@ func (r *SCTPTransport) StartContext(ctx context.Context, capabilities SCTPCapab
 	r.dataChannelsOpened += openedDCCount
 	r.lock.Unlock()
 
-	go r.acceptDataChannels(sctpAssociation, dataChannels)
+	go r.acceptDataChannels(sctpAssociation)
 
 	return nil
 }
@@ -217,7 +233,7 @@ func (r *SCTPTransport) optionalSCTPClientOptions() []sctp.ClientOption {
 		opts = append(opts, sctp.WithEnableZeroChecksum(true))
 	}
 
-	if r.api.settingEngine.detach.DataChannels && r.api.settingEngine.dataChannelBlockWrite {
+	if r.api.settingEngine.dataChannelBlockWrite {
 		opts = append(opts, sctp.WithBlockWrite(true))
 	}
 
@@ -254,57 +270,128 @@ func (r *SCTPTransport) Stop() error {
 	r.sctpAssociation.Abort("")
 
 	r.sctpAssociation = nil
+	clear(r.dataChannelIDsUsed)
 	r.state = SCTPTransportStateClosed
 
 	return nil
 }
 
+func (r *SCTPTransport) addDataChannel(channel *DataChannel) error {
+	id := channel.ID()
+	r.lock.Lock()
+	if id != nil {
+		owner := r.dataChannelIDsUsed[*id]
+		if owner.reserved() {
+			r.lock.Unlock()
+
+			return fmt.Errorf("%w: %d", errDataChannelIDInUse, *id)
+		}
+		owner.reservedBy = channel
+		r.dataChannelIDsUsed[*id] = owner
+	}
+	r.dataChannels = append(r.dataChannels, channel)
+	r.dataChannelsRequested++
+	connected := r.state == SCTPTransportStateConnected
+	r.lock.Unlock()
+
+	if connected {
+		if err := channel.open(r); err != nil {
+			r.lock.Lock()
+			r.dataChannels = slices.DeleteFunc(r.dataChannels, func(registered *DataChannel) bool {
+				return registered == channel
+			})
+			r.dataChannelsRequested--
+			r.lock.Unlock()
+
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (r *SCTPTransport) openDataChannelStream(
+	channel *DataChannel,
+	id *uint16,
+	dtlsRole DTLSRole,
+) (*sctp.Stream, error) {
+	r.lock.Lock()
+	defer r.lock.Unlock()
+
+	if id == nil {
+		generatedID, err := r.nextDataChannelID(dtlsRole)
+		if err != nil {
+			return nil, err
+		}
+		id = &generatedID
+	}
+	owner := r.dataChannelIDsUsed[*id]
+	if owner.reservedBy != channel && owner.reserved() {
+		return nil, fmt.Errorf("%w: %d", errDataChannelIDInUse, *id)
+	}
+	if owner.reservedBy == channel {
+		owner.reservedBy = nil
+		r.dataChannelIDsUsed[*id] = owner
+	}
+	if r.sctpAssociation == nil {
+		return nil, errSCTPNotEstablished
+	}
+	stream, err := r.sctpAssociation.OpenStream(*id, sctp.PayloadTypeWebRTCBinary)
+	if err != nil {
+		return nil, err
+	}
+	if owner.stream.Value() == stream || stream.State() != sctp.StreamStateOpen {
+		return nil, fmt.Errorf("%w: %d", errDataChannelIDInUse, *id)
+	}
+	r.dataChannelIDsUsed[*id] = dataChannelStreamOwner{stream: weak.Make(stream)}
+
+	return stream, nil
+}
+
+func (r *SCTPTransport) claimIncomingDataChannelStream(assoc *sctp.Association, stream *sctp.Stream) bool {
+	r.lock.Lock()
+	defer r.lock.Unlock()
+
+	id := stream.StreamIdentifier()
+	owner := r.dataChannelIDsUsed[id]
+	if r.sctpAssociation != assoc || owner.reserved() || owner.stream.Value() == stream ||
+		stream.State() != sctp.StreamStateOpen {
+		return false
+	}
+	r.dataChannelIDsUsed[id] = dataChannelStreamOwner{stream: weak.Make(stream)}
+
+	return true
+}
+
 //nolint:cyclop
-func (r *SCTPTransport) acceptDataChannels(
-	assoc *sctp.Association,
-	existingDataChannels []*DataChannel,
-) {
-	dataChannels := make([]*datachannel.DataChannel, 0, len(existingDataChannels))
-	for _, dc := range existingDataChannels {
-		dc.mu.Lock()
-		isNil := dc.dataChannel == nil
-		dc.mu.Unlock()
-		if isNil {
+func (r *SCTPTransport) acceptDataChannels(assoc *sctp.Association) {
+ACCEPT:
+	for r.association() == assoc {
+		stream, err := assoc.AcceptStream()
+		if err != nil {
+			break
+		}
+		// Check the ownership of this stream before reading DCEP or sending an ACK.
+		if !r.claimIncomingDataChannelStream(assoc, stream) {
 			continue
 		}
-		dataChannels = append(dataChannels, dc.dataChannel)
-	}
-ACCEPT:
-	for {
-		// check if the association has been stopped before calling accept.
-		r.lock.RLock()
-		currentAssoc := r.sctpAssociation
-		shouldStop := currentAssoc == nil || currentAssoc != assoc
-		r.lock.RUnlock()
-		if shouldStop {
-			r.onClose(nil)
 
-			return
-		}
-
-		dc, err := datachannel.Accept(assoc, &datachannel.Config{
+		stream.SetDefaultPayloadType(sctp.PayloadTypeWebRTCBinary)
+		dc, err := datachannel.Server(stream, &datachannel.Config{
 			LoggerFactory: r.api.settingEngine.LoggerFactory,
-		}, dataChannels...)
+		})
+		if errors.Is(err, io.EOF) {
+			// A stream reset may arrive while we wait for its OPEN.
+			_ = stream.Close()
+
+			continue
+		}
 		if err != nil {
-			if !errors.Is(err, io.EOF) {
-				r.log.Errorf("Failed to accept data channel: %v", err)
-				r.onError(err)
-				r.onClose(err)
-			} else {
-				r.onClose(nil)
-			}
+			r.log.Errorf("Failed to accept data channel: %v", err)
+			r.onError(err)
+			r.onClose(err)
 
 			return
-		}
-		for _, ch := range dataChannels {
-			if ch.StreamIdentifier() == dc.StreamIdentifier() {
-				continue ACCEPT
-			}
 		}
 
 		var (
@@ -367,6 +454,8 @@ ACCEPT:
 			handler(rtcDC)
 		}
 	}
+
+	r.onClose(nil)
 }
 
 // OnError sets an event handler which is invoked when the SCTP Association errors.
@@ -423,13 +512,6 @@ func (r *SCTPTransport) onDataChannel(dc *DataChannel) (done chan struct{}) {
 	r.lock.Lock()
 	r.dataChannels = append(r.dataChannels, dc)
 	r.dataChannelsAccepted++
-	if dc.ID() != nil {
-		r.dataChannelIDsUsed[*dc.ID()] = struct{}{}
-	} else {
-		// This cannot happen, the constructor for this datachannel in the caller
-		// takes a pointer to the id.
-		r.log.Errorf("accepted data channel with no ID")
-	}
 	handler := r.onDataChannelHandler
 	r.lock.Unlock()
 
@@ -494,9 +576,10 @@ func (r *SCTPTransport) Metadata() (SCTPTransportMetadata, bool) {
 // Stats reports the current statistics of the SCTPTransport.
 func (r *SCTPTransport) Stats() SCTPTransportStats {
 	stats := SCTPTransportStats{
-		Timestamp: statsTimestampFrom(time.Now()),
-		Type:      StatsTypeSCTPTransport,
-		ID:        "sctpTransport",
+		Timestamp:   statsTimestampFrom(time.Now()),
+		Type:        StatsTypeSCTPTransport,
+		ID:          "sctpTransport",
+		TransportID: r.Transport().statsID,
 	}
 
 	association := r.association()
@@ -522,28 +605,26 @@ func (r *SCTPTransport) collectStats(collector *statsReportCollector) {
 	collector.Collect(stats.ID, stats)
 }
 
-func (r *SCTPTransport) generateAndSetDataChannelID(dtlsRole DTLSRole, idOut **uint16) error {
+// nextDataChannelID requires the caller to hold r.lock.
+func (r *SCTPTransport) nextDataChannelID(dtlsRole DTLSRole) (uint16, error) {
 	var id uint16
 	if dtlsRole != DTLSRoleClient {
 		id++
 	}
 
-	maxVal := r.MaxChannels()
-
-	r.lock.Lock()
-	defer r.lock.Unlock()
-
+	maxVal := sctpMaxChannels
+	if r.maxChannels != nil {
+		maxVal = *r.maxChannels
+	}
 	for ; id < maxVal-1; id += 2 {
 		if _, ok := r.dataChannelIDsUsed[id]; ok {
 			continue
 		}
-		*idOut = &id
-		r.dataChannelIDsUsed[id] = struct{}{}
 
-		return nil
+		return id, nil
 	}
 
-	return &rtcerr.OperationError{Err: ErrMaxDataChannelID}
+	return 0, &rtcerr.OperationError{Err: ErrMaxDataChannelID}
 }
 
 func (r *SCTPTransport) association() *sctp.Association {

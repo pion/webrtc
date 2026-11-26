@@ -21,11 +21,7 @@ func TestNewSCTPTransportState(t *testing.T) {
 	}
 
 	for i, testCase := range testCases {
-		assert.Equal(t,
-			testCase.expectedTransportState,
-			newSCTPTransportState(testCase.transportStateString),
-			"testCase: %d %v", i, testCase,
-		)
+		assert.Equal(t, testCase.expectedTransportState, newSCTPTransportState(testCase.transportStateString), "testCase: %d %v", i, testCase)
 	}
 }
 
@@ -41,10 +37,6 @@ func TestSCTPTransportState_String(t *testing.T) {
 	}
 
 	for i, testCase := range testCases {
-		assert.Equal(t,
-			testCase.expectedString,
-			testCase.transportState.String(),
-			"testCase: %d %v", i, testCase,
-		)
+		assert.Equal(t, testCase.expectedString, testCase.transportState.String(), "testCase: %d %v", i, testCase)
 	}
 }

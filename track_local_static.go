@@ -6,11 +6,11 @@
 package webrtc
 
 import (
+	"errors"
 	"strings"
 	"sync"
 
 	"github.com/pion/rtp"
-	"github.com/pion/webrtc/v5/internal/util"
 	"github.com/pion/webrtc/v5/pkg/media"
 )
 
@@ -197,8 +197,13 @@ func (s *TrackLocalStaticRTP) writeRTP(packet *rtp.Packet) error {
 	defer s.mu.RUnlock()
 
 	writeErrs := []error{}
+	header := packet.Header
 
 	for _, b := range s.bindings {
+		// Every binding belongs to a different RTPSender, whose interceptors may modify the header in place
+		// (e.g. add header extensions using the IDs negotiated with that peer). Start each one from a fresh
+		// copy so that those changes are not sent to the following bindings.
+		packet.Header = header.Clone()
 		packet.Header.SSRC = uint32(b.ssrc)
 		packet.Header.PayloadType = uint8(b.payloadType)
 		// b.writeStream.WriteRTP below expects header and payload separately, so value of Packet.PaddingSize
@@ -211,7 +216,7 @@ func (s *TrackLocalStaticRTP) writeRTP(packet *rtp.Packet) error {
 		}
 	}
 
-	return util.FlattenErrs(writeErrs)
+	return errors.Join(writeErrs...)
 }
 
 // Write writes a RTP Packet as a buffer to the TrackLocalStaticRTP
@@ -382,7 +387,7 @@ func (s *TrackLocalStaticSample) WriteSample(sample media.Sample) error {
 		}
 	}
 
-	return util.FlattenErrs(writeErrs)
+	return errors.Join(writeErrs...)
 }
 
 // GeneratePadding writes padding-only samples to the TrackLocalStaticSample
@@ -407,5 +412,5 @@ func (s *TrackLocalStaticSample) GeneratePadding(samples uint32) error {
 		}
 	}
 
-	return util.FlattenErrs(writeErrs)
+	return errors.Join(writeErrs...)
 }

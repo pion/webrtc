@@ -36,7 +36,11 @@ const (
 
 	sdpAttributeRid = "rid"
 
+	sdpRidDirectionRecv = "recv"
+
 	sdpAttributeSimulcast = "simulcast"
+
+	ssrcGroupSimulcast = "SIM"
 
 	outboundMTU = 1200
 
@@ -46,7 +50,7 @@ const (
 
 	incomingUnhandledRTPSsrc = "Incoming unhandled RTP ssrc(%d), OnTrack will not be fired. %v"
 
-	useReadSimulcast = "Use ReadSimulcast(rid) instead of Read() when multiple tracks are present"
+	useReadSimulcast = "Use ReadSimulcast(rid)/ReadSimulcastSSRC(ssrc) instead of Read() when multiple tracks are present"
 
 	generatedCertificateOrigin = "WebRTC"
 

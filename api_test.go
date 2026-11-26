@@ -22,9 +22,7 @@ func TestNewAPI_Options(t *testing.T) {
 	s := SettingEngine{}
 	s.DetachDataChannels()
 
-	api := NewAPI(
-		WithSettingEngine(s),
-	)
+	api := NewAPI(WithSettingEngine(s))
 
 	assert.True(t, api.settingEngine.detach.DataChannels, "failed to set settings engine")
 	assert.NotEmpty(t, api.mediaEngine.audioCodecs, "failed to set audio codecs")
@@ -32,10 +30,7 @@ func TestNewAPI_Options(t *testing.T) {
 }
 
 func TestNewAPI_OptionsDefaultize(t *testing.T) {
-	api := NewAPI(
-		WithMediaEngine(nil),
-		WithInterceptorRegistry(nil),
-	)
+	api := NewAPI(WithMediaEngine(nil), WithInterceptorRegistry(nil))
 
 	assert.NotNil(t, api.settingEngine)
 	assert.NotNil(t, api.mediaEngine)

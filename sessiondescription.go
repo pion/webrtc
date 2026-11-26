@@ -46,14 +46,50 @@ type SessionDescription struct {
 }
 
 // Unmarshal is a helper to deserialize the sdp.
+// It does not modify the SessionDescription, so it is safe to call
+// on a description that is owned by a PeerConnection.
 func (sd *SessionDescription) Unmarshal() (*sdp.SessionDescription, error) {
-	sd.parsed = &sdp.SessionDescription{}
-	err := sd.parsed.UnmarshalString(sd.SDP)
+	parsed := &sdp.SessionDescription{}
+	err := parsed.UnmarshalString(sd.SDP)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", ErrSDPUnmarshalling, err)
 	}
 
-	return sd.parsed, nil
+	return parsed, nil
+}
+
+func (sd *SessionDescription) updateWithCandidate(candidate ICECandidateInit) error {
+	// Reparse the copy to avoid mutating the shared attributes.
+	parsed, err := sd.Unmarshal()
+	if err != nil {
+		return err
+	}
+
+	candidateValue := strings.TrimPrefix(candidate.Candidate, "candidate:")
+	for index, media := range parsed.MediaDescriptions {
+		switch {
+		case candidate.SDPMid != nil:
+			if mid, _ := media.Attribute(sdp.AttrKeyMID); mid != *candidate.SDPMid {
+				continue
+			}
+		case candidate.SDPMLineIndex != nil:
+			if index != int(*candidate.SDPMLineIndex) {
+				continue
+			}
+		default:
+			continue
+		}
+
+		media.WithValueAttribute("candidate", candidateValue)
+	}
+
+	marshaled, err := parsed.Marshal()
+	if err != nil {
+		return err
+	}
+	sd.SDP = string(marshaled)
+
+	return nil
 }
 
 func hasICETrickleOption(desc *sdp.SessionDescription) bool {

@@ -9,6 +9,7 @@ package detacheddtls
 
 import (
 	"context"
+	"errors"
 	"io"
 	"os"
 	"sync"
@@ -17,7 +18,6 @@ import (
 	"github.com/pion/dtls/v4"
 	"github.com/pion/transport/v5/deadline"
 	"github.com/pion/webrtc/v5/internal/netconn"
-	"github.com/pion/webrtc/v5/internal/util"
 )
 
 // Config contains the transport operations used by a Conn.
@@ -26,7 +26,7 @@ type Config struct {
 	SetDatagramHandler func(func([]byte) error) func()
 	TransportClosed    <-chan struct{}
 	NetConn            netconn.Config
-	OnClose            func()
+	OnClose            func(error)
 }
 
 // Conn pumps a DetachedConn and exposes only its plaintext application data as
@@ -143,7 +143,7 @@ func (c *Conn) processEvents() {
 				// report handshake failure before OnClose initiates shutdown.
 				c.notify(err)
 				if c.ready {
-					_ = c.close(false)
+					_ = c.close(false, err)
 					c.eventMu.Unlock()
 
 					return
@@ -181,6 +181,9 @@ func (c *Conn) processReadyEvents(conn *dtls.DetachedConn) error {
 			c.ready = true
 			c.notify(nil)
 			c.driveMu.Unlock()
+		case dtls.DetachedEarlyDataReady, dtls.DetachedEarlyDataAccepted, dtls.DetachedEarlyDataRejected:
+			// WebRTC does not use DTLS 0rtt/early data.
+			continue
 		case dtls.DetachedClosed:
 			if event.Err == nil {
 				event.Err = io.EOF
@@ -242,14 +245,14 @@ func (c *Conn) shutdown(flushEvents bool) error {
 	defer c.eventMu.Unlock()
 	c.driveMu.Lock()
 
-	return c.close(flushEvents)
+	return c.close(flushEvents, nil)
 }
 
-func (c *Conn) close(flushEvents bool) error {
-	var onClose func()
+func (c *Conn) close(flushEvents bool, cause error) error {
+	var onClose func(error)
 	if !c.closed {
 		c.closed = true
-		c.closeErr = util.FlattenErrs([]error{c.stop(flushEvents), c.Conn.Close()})
+		c.closeErr = errors.Join(c.stop(flushEvents), c.Conn.Close())
 		c.writeDeadline.Set(time.Time{})
 		c.config.SetDatagramHandler(nil)
 		onClose = c.config.OnClose
@@ -257,7 +260,7 @@ func (c *Conn) close(flushEvents bool) error {
 	err := c.closeErr
 	c.driveMu.Unlock()
 	if onClose != nil {
-		onClose()
+		onClose(cause)
 	}
 
 	return err
@@ -278,7 +281,7 @@ func (c *Conn) stop(flush bool) error {
 	c.dtlsConn, c.ready = nil, false
 	c.notify(io.ErrClosedPipe)
 
-	return util.FlattenErrs(errs)
+	return errors.Join(errs...)
 }
 
 func (c *Conn) notify(err error) {

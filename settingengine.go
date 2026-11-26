@@ -20,7 +20,7 @@ import (
 	"github.com/pion/dtls/v4/pkg/protocol/handshake"
 	"github.com/pion/ice/v5"
 	"github.com/pion/logging"
-	"github.com/pion/stun/v4"
+	"github.com/pion/stun/v5"
 	"github.com/pion/transport/v5"
 	"github.com/pion/transport/v5/packetio"
 	"golang.org/x/net/proxy"
@@ -69,7 +69,7 @@ type SettingEngine struct {
 	dtls struct {
 		minVersion                    protocol.Version
 		maxVersion                    protocol.Version
-		insecureSkipHelloVerify       bool
+		insecureSkipHelloVerify       *bool
 		disableInsecureSkipVerify     bool
 		retransmissionInterval        time.Duration
 		ellipticCurves                []dtlsElliptic.Curve
@@ -83,7 +83,7 @@ type SettingEngine struct {
 		customCipherSuites            func() []dtlsCipherSuite.Suite
 		clientHelloMessageHook        func(handshake.MessageClientHello) handshake.Message
 		serverHelloMessageHook        func(handshake.MessageServerHello) handshake.Message
-		certificateRequestMessageHook func(handshake.MessageCertificateRequest) handshake.Message
+		certificateRequestMessageHook func(handshake.Message) handshake.Message
 		supportedProtocols            []string
 	}
 	sctp struct {
@@ -106,6 +106,7 @@ type SettingEngine struct {
 	LoggerFactory                             logging.LoggerFactory
 	iceTCPMux                                 ice.TCPMux
 	iceUDPMux                                 ice.UDPMux
+	iceUDPMuxSrflx                            ice.UniversalUDPMux
 	iceProxyDialer                            proxy.Dialer
 	iceDisableActiveTCP                       bool
 	iceUseCandidateCheckPriority              bool
@@ -217,10 +218,11 @@ func (e *SettingEngine) DetachDataChannels() {
 	e.detach.DataChannels = true
 }
 
-// EnableDataChannelBlockWrite allows data channels to block on write,
-// it only works if DetachDataChannels is enabled.
-func (e *SettingEngine) EnableDataChannelBlockWrite(nonblockWrite bool) {
-	e.dataChannelBlockWrite = nonblockWrite
+// EnableDataChannelBlockWrite allows data channels to block on write.
+// Blocking writes may be interrupted with DataChannel.SetWriteDeadline
+// or the SetWriteDeadline method on a detached data channel.
+func (e *SettingEngine) EnableDataChannelBlockWrite(blockWrite bool) {
+	e.dataChannelBlockWrite = blockWrite
 }
 
 // SetSRTPProtectionProfiles allows the user to override the default SRTP Protection Profiles
@@ -387,6 +389,8 @@ func (e *SettingEngine) SetIncludeLoopbackCandidate(include bool) {
 // DTLSRolePassive:
 //
 //	Act as DTLS Server, wait for ClientHello
+//
+// Offers that require the opposite local role are rejected.
 func (e *SettingEngine) SetAnsweringDTLSRole(role DTLSRole) error {
 	if role != DTLSRoleClient && role != DTLSRoleServer {
 		return errSettingEngineSetAnsweringDTLSRole
@@ -469,15 +473,24 @@ func (e *SettingEngine) SetSDPMediaLevelFingerprints(sdpMediaLevelFingerprints b
 
 // SetICETCPMux enables ICE-TCP when set to a non-nil value. Make sure that
 // NetworkTypeTCP4 or NetworkTypeTCP6 is enabled as well.
-func (e *SettingEngine) SetICETCPMux(tcpMux ice.TCPMux) {
+func (e *SettingEngine) SetICETCPMux(tcpMux ICETCPMux) {
 	e.iceTCPMux = tcpMux
 }
 
 // SetICEUDPMux allows ICE traffic to come through a single UDP port, drastically
 // simplifying deployments where ports will need to be opened/forwarded.
 // UDPMux should be started prior to creating PeerConnections.
-func (e *SettingEngine) SetICEUDPMux(udpMux ice.UDPMux) {
+func (e *SettingEngine) SetICEUDPMux(udpMux ICEUDPMux) {
 	e.iceUDPMux = udpMux
+}
+
+// SetICEUDPMuxSrflx allows ICE traffic from server reflexive candidates to be
+// multiplexed onto a single UDP port. This enables STUN binding requests, used
+// to gather server reflexive candidates, to share the same port as host
+// candidates instead of allocating an additional port per PeerConnection.
+// The mux should be started prior to creating PeerConnections.
+func (e *SettingEngine) SetICEUDPMuxSrflx(udpMuxSrflx ice.UniversalUDPMux) {
+	e.iceUDPMuxSrflx = udpMuxSrflx
 }
 
 // SetICEProxyDialer sets the proxy dialer interface based on golang.org/x/net/proxy.
@@ -543,11 +556,13 @@ func (e *SettingEngine) SetDTLSRetransmissionInterval(interval time.Duration) {
 }
 
 // SetDTLSInsecureSkipHelloVerify sets the skip HelloVerify flag for DTLS.
-// If true and when acting as DTLS server, will allow client to skip hello verify phase and
-// receive ServerHello after initial ClientHello. This will mean faster connect times,
-// but will have lower DoS attack resistance.
+//
+// The HelloVerifyRequest cookie exchange is skipped by default when using a
+// full ICE agent, since ICE connectivity checks have already validated the
+// remote address. It is enabled by default when using an ICE Lite agent.
+// This setting overrides the default when acting as DTLS server.
 func (e *SettingEngine) SetDTLSInsecureSkipHelloVerify(skip bool) {
-	e.dtls.insecureSkipHelloVerify = skip
+	e.dtls.insecureSkipHelloVerify = &skip
 }
 
 // SetDTLSDisableInsecureSkipVerify sets the disable skip insecure verify flag for DTLS.
@@ -578,6 +593,7 @@ func (e *SettingEngine) SetDTLSExtendedMasterSecret(extendedMasterSecret dtls.Ex
 }
 
 // SetDTLSClientAuth sets the client auth type for DTLS.
+// WebRTC requires a peer certificate even when DTLS client auth is optional.
 func (e *SettingEngine) SetDTLSClientAuth(clientAuth dtls.ClientAuthType) {
 	e.dtls.clientAuth = &clientAuth
 }
@@ -648,9 +664,10 @@ func (e *SettingEngine) SetDTLSServerHelloMessageHook(hook func(handshake.Messag
 }
 
 // SetDTLSCertificateRequestMessageHook if not nil, is called when a DTLS Certificate Request message is sent
-// from a client. The returned handshake message replaces the original message.
+// from a server using DTLS 1.2 or 1.3. The hook receives a *dtls12.MessageCertificateRequest
+// or *dtls13.MessageCertificateRequest. The returned handshake message replaces the original message.
 func (e *SettingEngine) SetDTLSCertificateRequestMessageHook(
-	hook func(handshake.MessageCertificateRequest) handshake.Message,
+	hook func(handshake.Message) handshake.Message,
 ) {
 	e.dtls.certificateRequestMessageHook = hook
 }

@@ -7,13 +7,14 @@ package webrtc
 
 import (
 	"fmt"
+	"slices"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	"github.com/pion/ice/v5"
 	"github.com/pion/logging"
-	"github.com/pion/stun/v4"
+	"github.com/pion/stun/v5"
 )
 
 // ICEGatherer gathers local host, server reflexive and relay
@@ -72,6 +73,8 @@ type ICEAddressRewriteRule struct {
 	AsCandidateType ICECandidateType
 	Mode            ICEAddressRewriteMode
 	Networks        []NetworkType
+	OriginalPort    int
+	NewPort         int
 }
 
 func (r ICEAddressRewriteRule) toICE() ice.AddressRewriteRule {
@@ -87,6 +90,8 @@ func (r ICEAddressRewriteRule) toICE() ice.AddressRewriteRule {
 		AsCandidateType: candidateType,
 		Mode:            mode,
 		Networks:        networks,
+		OriginalPort:    r.OriginalPort,
+		NewPort:         r.NewPort,
 	}
 
 	return rule
@@ -239,6 +244,7 @@ func (g *ICEGatherer) baseAgentOptions(mDNSMode ice.MulticastDNSMode) []ice.Agen
 		ice.WithMulticastDNSMode(mDNSMode),
 		ice.WithTCPMux(g.api.settingEngine.iceTCPMux),
 		ice.WithUDPMux(g.api.settingEngine.iceUDPMux),
+		ice.WithUDPMuxSrflx(g.api.settingEngine.iceUDPMuxSrflx),
 		ice.WithProxyDialer(g.api.settingEngine.iceProxyDialer),
 		ice.WithBindingRequestHandler(g.api.settingEngine.iceBindingRequestHandler),
 	}
@@ -286,7 +292,10 @@ func (g *ICEGatherer) miscOptions() []ice.AgentOption {
 		opts = append(opts, ice.WithIncludeLoopback())
 	}
 
-	if g.api.settingEngine.iceDisableActiveTCP {
+	// Active TCP creates host candidates outside Gather.
+	candidateTypes := g.resolveCandidateTypes()
+	excludesHost := len(candidateTypes) > 0 && !slices.Contains(candidateTypes, ice.CandidateTypeHost)
+	if g.api.settingEngine.iceDisableActiveTCP || excludesHost {
 		opts = append(opts, ice.WithDisableActiveTCP())
 	}
 
@@ -490,6 +499,11 @@ func (g *ICEGatherer) close(shouldGracefullyClose bool) error {
 	defer g.lock.Unlock()
 
 	if g.agent == nil {
+		// Closing is terminal even if no agent was ever created, otherwise a
+		// later Gather/GetLocalParameters/AddRemoteCandidate would create an
+		// agent that nothing closes.
+		g.setState(ICEGathererStateClosed)
+
 		return nil
 	}
 	if shouldGracefullyClose {
@@ -603,7 +617,7 @@ func (g *ICEGatherer) getAgent() *ice.Agent {
 	return g.agent
 }
 
-func (g *ICEGatherer) collectStats(collector *statsReportCollector) {
+func (g *ICEGatherer) collectStats(collector *statsReportCollector, transportStatsID string) {
 	agent := g.getAgent()
 	if agent == nil {
 		return
@@ -621,6 +635,7 @@ func (g *ICEGatherer) collectStats(collector *statsReportCollector) {
 
 				continue
 			}
+			stats.TransportID = transportStatsID
 
 			collector.Collect(stats.ID, stats)
 		}
@@ -641,6 +656,7 @@ func (g *ICEGatherer) collectStats(collector *statsReportCollector) {
 			stats := ICECandidateStats{
 				Timestamp:     statsTimestampFrom(candidateStats.Timestamp),
 				ID:            candidateStats.ID,
+				TransportID:   transportStatsID,
 				Type:          StatsTypeLocalCandidate,
 				Address:       candidateStats.IP,
 				Port:          int32(candidateStats.Port), //nolint:gosec // G115, no overflow, port
@@ -649,7 +665,6 @@ func (g *ICEGatherer) collectStats(collector *statsReportCollector) {
 				Priority:      int32(candidateStats.Priority), //nolint:gosec
 				URL:           candidateStats.URL,
 				RelayProtocol: candidateStats.RelayProtocol,
-				Deleted:       candidateStats.Deleted,
 			}
 			collector.Collect(stats.ID, stats)
 		}
@@ -669,6 +684,7 @@ func (g *ICEGatherer) collectStats(collector *statsReportCollector) {
 			stats := ICECandidateStats{
 				Timestamp:     statsTimestampFrom(candidateStats.Timestamp),
 				ID:            candidateStats.ID,
+				TransportID:   transportStatsID,
 				Type:          StatsTypeRemoteCandidate,
 				Address:       candidateStats.IP,
 				Port:          int32(candidateStats.Port), //nolint:gosec // G115, no overflow, port

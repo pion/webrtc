@@ -9,7 +9,7 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/pion/stun/v4"
+	"github.com/pion/stun/v5"
 	"github.com/pion/webrtc/v5/pkg/rtcerr"
 	"github.com/stretchr/testify/assert"
 )
@@ -90,11 +90,7 @@ func TestICEServer_validate(t *testing.T) {
 
 		for i, testCase := range testCases {
 			_, err := testCase.iceServer.urls()
-			assert.EqualError(t,
-				err,
-				testCase.expectedErr.Error(),
-				"testCase: %d %v", i, testCase,
-			)
+			assert.EqualError(t, err, testCase.expectedErr.Error(), "testCase: %d %v", i, testCase)
 		}
 	})
 	t.Run("JsonFailure", func(t *testing.T) {

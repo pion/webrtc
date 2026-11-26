@@ -21,11 +21,7 @@ func TestNewICEGatheringState(t *testing.T) {
 	}
 
 	for i, testCase := range testCases {
-		assert.Equal(t,
-			testCase.expectedState,
-			NewICEGatheringState(testCase.stateString),
-			"testCase: %d %v", i, testCase,
-		)
+		assert.Equal(t, testCase.expectedState, NewICEGatheringState(testCase.stateString), "testCase: %d %v", i, testCase)
 	}
 }
 
@@ -41,10 +37,6 @@ func TestICEGatheringState_String(t *testing.T) {
 	}
 
 	for i, testCase := range testCases {
-		assert.Equal(t,
-			testCase.expectedString,
-			testCase.state.String(),
-			"testCase: %d %v", i, testCase,
-		)
+		assert.Equal(t, testCase.expectedString, testCase.state.String(), "testCase: %d %v", i, testCase)
 	}
 }

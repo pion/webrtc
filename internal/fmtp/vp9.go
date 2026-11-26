@@ -4,6 +4,7 @@
 package fmtp
 
 type vp9FMTP struct {
+	clockRate  uint32
 	parameters map[string]string
 }
 
@@ -12,8 +13,12 @@ func (h *vp9FMTP) MimeType() string {
 }
 
 func (h *vp9FMTP) Match(b FMTP) bool {
-	c, ok := b.(*vp9FMTP)
+	other, ok := b.(*vp9FMTP)
 	if !ok {
+		return false
+	}
+
+	if !ClockRateEqual(h.MimeType(), h.clockRate, other.clockRate) {
 		return false
 	}
 
@@ -24,7 +29,7 @@ func (h *vp9FMTP) Match(b FMTP) bool {
 	if !ok {
 		hProfileID = "0"
 	}
-	cProfileID, ok := c.parameters["profile-id"]
+	cProfileID, ok := other.parameters["profile-id"]
 	if !ok {
 		cProfileID = "0"
 	}

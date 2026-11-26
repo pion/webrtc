@@ -6,6 +6,7 @@
 package webrtc
 
 import (
+	"cmp"
 	"encoding/base64"
 	"errors"
 	"fmt"
@@ -18,6 +19,7 @@ import (
 	"github.com/pion/ice/v5"
 	"github.com/pion/logging"
 	"github.com/pion/sdp/v3"
+	"github.com/pion/webrtc/v5/internal/fmtp"
 )
 
 // trackDetails represents any media source that can be represented in a SDP
@@ -28,8 +30,8 @@ type trackDetails struct {
 	streamID string
 	id       string
 	ssrcs    []SSRC
-	rtxSsrc  *SSRC
-	fecSsrc  *SSRC
+	rtxSsrc  []*SSRC
+	fecSsrc  []*SSRC
 	rids     []string
 }
 
@@ -74,12 +76,16 @@ func filterTrackWithSSRC(incomingTracks []trackDetails, ssrc SSRC) []trackDetail
 
 // extract all trackDetails from an SDP.
 //
-//nolint:gocognit,gocyclo,cyclop
+//nolint:cyclop,nestif
 func trackDetailsFromSDP(
 	log logging.LeveledLogger,
 	s *sdp.SessionDescription,
 ) (incomingTracks []trackDetails) {
 	for _, media := range s.MediaDescriptions {
+		if isRejectedMediaSection(media) {
+			continue
+		}
+
 		direction := getPeerDirection(media, s)
 		if direction == RTPTransceiverDirectionRecvonly || direction == RTPTransceiverDirectionInactive {
 			continue
@@ -101,6 +107,17 @@ func trackDetailsFromSDP(
 				continue
 			}
 			fields := strings.Fields(attr.Value)
+			if len(fields) > 0 && fields[0] == ssrcGroupSimulcast && len(track.ssrcs) == 0 {
+				for _, field := range fields[1:] {
+					value, err := strconv.ParseUint(field, 10, 32)
+					if err != nil {
+						log.Warnf("Failed to parse SSRC: %v", err)
+
+						continue
+					}
+					track.ssrcs = append(track.ssrcs, SSRC(value))
+				}
+			}
 			if len(fields) != 3 || (fields[0] != sdp.SemanticTokenFlowIdentification &&
 				fields[0] != sdp.SemanticTokenForwardErrorCorrectionFramework) {
 				continue
@@ -163,23 +180,38 @@ func trackDetailsFromSDP(
 			}
 		}
 
-		if rids := getRids(media); len(rids) != 0 && track.id != "" && track.streamID != "" {
-			track.ssrcs = nil
-			for _, rid := range rids {
-				track.rids = append(track.rids, rid.id)
+		if track.id != "" && track.streamID != "" {
+			for _, rid := range getRids(media) {
+				if rid.direction != sdpRidDirectionRecv {
+					track.rids = append(track.rids, rid.id)
+				}
 			}
-		} else if len(track.ssrcs) != 0 {
+		}
+		switch {
+		case len(track.rids) != 0:
+			track.ssrcs = nil
+		case len(track.ssrcs) != 0:
+			ssrcPositions := make(map[SSRC]int, len(track.ssrcs))
+			for pos, ssrc := range slices.Backward(track.ssrcs) {
+				ssrcPositions[ssrc] = pos
+			}
 			for repair, base := range rtxRepairFlows {
-				if base == track.ssrcs[0] {
-					track.rtxSsrc = &repair
+				if pos, ok := ssrcPositions[base]; ok {
+					if track.rtxSsrc == nil {
+						track.rtxSsrc = make([]*SSRC, len(track.ssrcs))
+					}
+					track.rtxSsrc[pos] = &repair
 				}
 			}
 			for repair, base := range fecRepairFlows {
-				if base == track.ssrcs[0] {
-					track.fecSsrc = &repair
+				if pos, ok := ssrcPositions[base]; ok {
+					if track.fecSsrc == nil {
+						track.fecSsrc = make([]*SSRC, len(track.ssrcs))
+					}
+					track.fecSsrc[pos] = &repair
 				}
 			}
-		} else {
+		default:
 			continue
 		}
 
@@ -201,50 +233,98 @@ func trackDetailsToRTPReceiveParameters(trackDetails *trackDetails) RTPReceivePa
 			encodings[i].SSRC = trackDetails.ssrcs[i]
 		}
 
-		if trackDetails.rtxSsrc != nil {
-			encodings[i].RTX.SSRC = *trackDetails.rtxSsrc
+		if len(trackDetails.rtxSsrc) > i && trackDetails.rtxSsrc[i] != nil {
+			encodings[i].RTX.SSRC = *trackDetails.rtxSsrc[i]
 		}
 
-		if trackDetails.fecSsrc != nil {
-			encodings[i].FEC.SSRC = *trackDetails.fecSsrc
+		if len(trackDetails.fecSsrc) > i && trackDetails.fecSsrc[i] != nil {
+			encodings[i].FEC.SSRC = *trackDetails.fecSsrc[i]
 		}
 	}
 
 	return RTPReceiveParameters{Encodings: encodings}
 }
 
-func getRids(media *sdp.MediaDescription) []*simulcastRid { // nolint:cyclop
+func getRids(media *sdp.MediaDescription) []*simulcastRid { //nolint:cyclop
 	rids := []*simulcastRid{}
+	ridsByID := map[string]*simulcastRid{}
 	var simulcastAttr string
 	for _, attr := range media.Attributes {
 		if attr.Key == sdpAttributeRid {
 			split := strings.Split(attr.Value, " ")
-			rids = append(rids, &simulcastRid{id: split[0], attrValue: attr.Value})
+			rid := &simulcastRid{id: split[0], attrValue: attr.Value}
+			if len(split) > 1 {
+				rid.direction = split[1]
+			}
+			rids = append(rids, rid)
+			if _, ok := ridsByID[rid.id]; !ok {
+				ridsByID[rid.id] = rid
+			}
 		} else if attr.Key == sdpAttributeSimulcast {
 			simulcastAttr = attr.Value
 		}
 	}
-	// process paused stream like "a=simulcast:send 1;~2;~3"
-	if simulcastAttr != "" {
-		if space := strings.Index(simulcastAttr, " "); space > 0 {
-			simulcastAttr = simulcastAttr[space+1:]
+	// Prefer the send list when both directions are present (RFC 8853).
+	fields := strings.Fields(simulcastAttr)
+	simulcastAttr = ""
+	for i := 0; i+1 < len(fields); i += 2 {
+		if fields[i] == "send" || (fields[i] == "recv" && simulcastAttr == "") {
+			simulcastAttr = fields[i+1]
 		}
-		ridStates := strings.SplitSeq(simulcastAttr, ";")
-		for ridState := range ridStates {
-			if len(ridState) > 0 && ridState[:1] == "~" {
-				ridID := ridState[1:]
-				for _, rid := range rids {
-					if rid.id == ridID {
-						rid.paused = true
+	}
+	simulcastOrder := map[string]int{}
+	for _, scID := range strings.FieldsFunc(simulcastAttr, func(r rune) bool { return r == ';' || r == ',' }) {
+		ridID, paused := strings.CutPrefix(scID, "~")
+		if rid := ridsByID[ridID]; paused && rid != nil {
+			rid.paused = true
+		}
+		if _, ok := simulcastOrder[ridID]; !ok {
+			simulcastOrder[ridID] = len(simulcastOrder)
+		}
+	}
+	orderOf := func(id string) int {
+		if idx, ok := simulcastOrder[id]; ok {
+			return idx
+		}
 
-						break
-					}
-				}
+		return len(simulcastOrder)
+	}
+	slices.SortStableFunc(rids, func(a, b *simulcastRid) int {
+		return cmp.Compare(orderOf(a.id), orderOf(b.id))
+	})
+
+	return rids
+}
+
+// checkAnswerRids rejects an answer that announces simulcast rids the matching
+// media section of our offer did not offer to receive. An answer may only keep
+// or drop the rids it was offered, it cannot add any (RFC 8853 Section 5.3.2).
+func checkAnswerRids(offer, answer *sdp.SessionDescription) error {
+	offeredRids := map[string]map[string]bool{}
+	for _, media := range offer.MediaDescriptions {
+		midValue := getMidValue(media)
+		offeredRids[midValue] = map[string]bool{}
+		for _, rid := range getRids(media) {
+			if rid.direction == sdpRidDirectionRecv {
+				offeredRids[midValue][rid.id] = true
 			}
 		}
 	}
 
-	return rids
+	for _, media := range answer.MediaDescriptions {
+		midValue := getMidValue(media)
+		for _, rid := range getRids(media) {
+			// A rid the remote only wants to receive cannot make us receive anything.
+			if rid.direction == sdpRidDirectionRecv {
+				continue
+			}
+			if !offeredRids[midValue][rid.id] {
+				return fmt.Errorf("%w: mid %q rid %q", errPeerConnSimulcastRidNotOffered, midValue, rid.id)
+			}
+		}
+	}
+
+	return nil
 }
 
 func addCandidatesToMediaDescriptions(
@@ -292,16 +372,13 @@ func addCandidatesToMediaDescriptions(
 
 func addDataMediaSection(
 	descr *sdp.SessionDescription,
-	shouldAddCandidates bool,
 	dtlsFingerprints []DTLSFingerprint,
 	midValue string,
 	iceParams ICEParameters,
-	candidates []ICECandidate,
 	dtlsRole sdp.ConnectionRole,
-	iceGatheringState ICEGatheringState,
 	sctpMaxMessageSize uint32,
 	sctpInit []byte,
-) error {
+) {
 	media := (&sdp.MediaDescription{
 		MediaName: sdp.MediaName{
 			Media:   mediaSectionApplication,
@@ -331,19 +408,95 @@ func addDataMediaSection(
 		media = media.WithFingerprint(f.Algorithm, strings.ToUpper(f.Value))
 	}
 
-	if shouldAddCandidates {
-		if err := addCandidatesToMediaDescriptions(candidates, media, iceGatheringState); err != nil {
+	descr.WithMedia(media)
+}
+
+// Initial offers need candidates on every non-bundle-only section: the answer
+// can reject the proposed BUNDLE tag and select another section. Once BUNDLE is
+// negotiated, candidates belong on its tag.
+// https://www.rfc-editor.org/rfc/rfc9143.html#section-7.1.3
+func populateSDPCandidates(
+	description *sdp.SessionDescription,
+	candidates []ICECandidate,
+	state ICEGatheringState,
+	initialOffer bool,
+) error {
+	for _, section := range candidateMediaSections(description, initialOffer) {
+		if err := addCandidatesToMediaDescriptions(candidates, section.MediaDescription, state); err != nil {
 			return err
 		}
 	}
 
-	descr.WithMedia(media)
-
 	return nil
 }
 
+func candidateMediaSections(description *sdp.SessionDescription, initialOffer bool) []identifiedMediaDescription {
+	if description == nil {
+		return nil
+	}
+
+	if !initialOffer {
+		if section, ok := selectCandidateMediaSection(description); ok && section.MediaDescription.MediaName.Port.Value != 0 {
+			return []identifiedMediaDescription{*section}
+		}
+
+		return nil
+	}
+
+	var sections []identifiedMediaDescription
+	for index, media := range description.MediaDescriptions {
+		_, bundleOnly := media.Attribute("bundle-only")
+		if media.MediaName.Port.Value == 0 || bundleOnly {
+			continue
+		}
+		sections = append(sections, identifiedMediaDescription{
+			MediaDescription: media,
+			SDPMid:           getMidValue(media),
+			SDPMLineIndex:    uint16(index), //nolint:gosec // G115
+		})
+	}
+
+	return sections
+}
+
+// localCandidateMediaSections selects where local candidates belong using the
+// negotiated answer when available.
+func localCandidateMediaSections(
+	local, currentLocal, currentRemote *SessionDescription,
+) []identifiedMediaDescription {
+	if local == nil {
+		return nil
+	}
+	description := localCandidateDescription(local, currentLocal, currentRemote)
+	initialOffer := local.Type == SDPTypeOffer && currentRemote == nil
+
+	sections := candidateMediaSections(description, initialOffer)
+	for index := range sections {
+		media := getByMid(sections[index].SDPMid, local)
+		if media == nil {
+			return nil
+		}
+		sections[index].MediaDescription = media
+	}
+
+	return sections
+}
+
+func localCandidateDescription(local, currentLocal, currentRemote *SessionDescription) *sdp.SessionDescription {
+	if local == nil {
+		return nil
+	}
+	// A pending offer must not use the answer from the previous negotiation.
+	if local == currentLocal && local.Type == SDPTypeOffer &&
+		currentRemote != nil && currentRemote.Type == SDPTypeAnswer {
+		return currentRemote.parsed
+	}
+
+	return local.parsed
+}
+
 func populateLocalCandidates(
-	sessionDescription *SessionDescription,
+	sessionDescription, currentLocal, currentRemote *SessionDescription,
 	i *ICEGatherer,
 	iceGatheringState ICEGatheringState,
 ) *SessionDescription {
@@ -356,10 +509,28 @@ func populateLocalCandidates(
 		return sessionDescription
 	}
 
-	parsed := sessionDescription.parsed
-	if len(parsed.MediaDescriptions) > 0 {
-		mediaDescr := parsed.MediaDescriptions[0]
-		if err = addCandidatesToMediaDescriptions(candidates, mediaDescr, iceGatheringState); err != nil {
+	// GetLocalCandidates may change the order of candidates.
+	// Sort them so that SDP generation returns same value everytime
+	slices.SortFunc(candidates, func(a, b ICECandidate) int {
+		return cmp.Compare(a.statsID, b.statsID)
+	})
+
+	// Candidate population must not mutate the stored SDP, which can still be
+	// read by SetLocalDescription after it releases the PeerConnection lock.
+	parsed := *sessionDescription.parsed
+	parsed.MediaDescriptions = slices.Clone(parsed.MediaDescriptions)
+	for index, media := range parsed.MediaDescriptions {
+		cloned := *media
+		cloned.Attributes = slices.Clone(media.Attributes)
+		parsed.MediaDescriptions[index] = &cloned
+	}
+	local := *sessionDescription
+	local.parsed = &parsed
+	if currentLocal == sessionDescription {
+		currentLocal = &local
+	}
+	for _, section := range localCandidateMediaSections(&local, currentLocal, currentRemote) {
+		if err = addCandidatesToMediaDescriptions(candidates, section.MediaDescription, iceGatheringState); err != nil {
 			return sessionDescription
 		}
 	}
@@ -372,11 +543,11 @@ func populateLocalCandidates(
 	return &SessionDescription{
 		SDP:    string(sdp),
 		Type:   sessionDescription.Type,
-		parsed: parsed,
+		parsed: &parsed,
 	}
 }
 
-//nolint:gocognit,cyclop
+//nolint:cyclop
 func addSenderSDP(
 	transceiver *RTPTransceiver,
 	media *sdp.MediaDescription,
@@ -455,17 +626,34 @@ func addSenderSDP(
 	}
 }
 
-//nolint:cyclop, gocognit
+// hasCommonCodec checks the codecs from one offered media section.
+func hasCommonCodec(media *sdp.MediaDescription, codecs []RTPCodecParameters) bool {
+	offered, err := codecsFromMediaDescription(media)
+	if err != nil {
+		return false
+	}
+
+	offeredFMTPs := parseCodecFMTPs(offered)
+	for _, codec := range codecs {
+		if strings.EqualFold(codec.MimeType, MimeTypeRTX) {
+			continue
+		}
+		if _, match := codecParametersFuzzySearchParsed(codec, offered, offeredFMTPs); match != codecMatchNone {
+			return true
+		}
+	}
+
+	return false
+}
+
+//nolint:cyclop
 func addTransceiverSDP(
 	descr *sdp.SessionDescription,
-	shouldAddCandidates bool,
 	dtlsFingerprints []DTLSFingerprint,
 	mediaEngine *MediaEngine,
 	midValue string,
 	iceParams ICEParameters,
-	candidates []ICECandidate,
 	dtlsRole sdp.ConnectionRole,
-	iceGatheringState ICEGatheringState,
 	mediaSection mediaSection,
 	ignoreRidPauseForRecv bool,
 ) (bool, error) {
@@ -475,14 +663,33 @@ func addTransceiverSDP(
 	}
 	// Use the first transceiver to generate the section attributes
 	transceiver := transceivers[0]
-	media := sdp.NewJSEPMediaDescription(transceiver.kind.String(), []string{}).
-		WithValueAttribute(sdp.AttrKeyConnectionSetup, dtlsRole.String()).
+	media := sdp.NewJSEPMediaDescription(transceiver.kind.String(), nil)
+	codecs := transceiver.getCodecs()
+	if mediaSection.remoteOffer != nil && !hasCommonCodec(mediaSection.remoteOffer, codecs) {
+		codecs = nil
+	}
+	if len(codecs) == 0 {
+		// A new offer needs codecs for each sender.
+		if mediaSection.remoteOffer == nil && transceiver.Sender() != nil {
+			return false, ErrSenderWithNoCodecs
+		}
+
+		// Keep the connection line supplied by NewJSEPMediaDescription even
+		// for rejected sections, Firefox requires it.
+		// https://www.rfc-editor.org/rfc/rfc4566.html#section-5.7
+		media.MediaName.Port.Value = 0
+		media.MediaName.Formats = []string{"0"}
+		descr.WithMedia(media.WithValueAttribute(sdp.AttrKeyMID, midValue).
+			WithPropertyAttribute(RTPTransceiverDirectionInactive.String()))
+
+		return false, nil
+	}
+
+	media.WithValueAttribute(sdp.AttrKeyConnectionSetup, dtlsRole.String()).
 		WithValueAttribute(sdp.AttrKeyMID, midValue).
 		WithICECredentials(iceParams.UsernameFragment, iceParams.Password).
 		WithPropertyAttribute(sdp.AttrKeyRTCPMux).
 		WithPropertyAttribute(sdp.AttrKeyRTCPRsize)
-
-	codecs := transceiver.getCodecs()
 	for _, codec := range codecs {
 		name := strings.TrimPrefix(codec.MimeType, "audio/")
 		name = strings.TrimPrefix(name, "video/")
@@ -496,38 +703,6 @@ func addTransceiverSDP(
 			}
 		}
 	}
-	if len(codecs) == 0 {
-		// If we are sender and we have no codecs throw an error early
-		if transceiver.Sender() != nil {
-			return false, ErrSenderWithNoCodecs
-		}
-
-		// Explicitly reject track if we don't have the codec
-		// We need to include connection information even if we're rejecting a track, otherwise Firefox will fail to
-		// parse the SDP with an error like:
-		// SIPCC Failed to parse SDP: SDP Parse Error on line 50:  c= connection line not specified for every media level,
-		// validation failed.
-		// In addition this makes our SDP compliant with RFC 4566 Section 5.7:
-		// https://datatracker.ietf.org/doc/html/rfc4566#section-5.7
-		descr.WithMedia(&sdp.MediaDescription{
-			Attributes: []sdp.Attribute{{Key: sdp.AttrKeyMID, Value: midValue}},
-			MediaName: sdp.MediaName{
-				Media:   transceiver.kind.String(),
-				Port:    sdp.RangedPort{Value: 0},
-				Protos:  []string{"UDP", "TLS", "RTP", "SAVPF"},
-				Formats: []string{"0"},
-			},
-			ConnectionInformation: &sdp.ConnectionInformation{
-				NetworkType: "IN",
-				AddressType: "IP4",
-				Address: &sdp.Address{
-					Address: "0.0.0.0",
-				},
-			},
-		})
-
-		return false, nil
-	}
 
 	directions := []RTPTransceiverDirection{}
 	if transceiver.Sender() != nil {
@@ -540,7 +715,8 @@ func addTransceiverSDP(
 	parameters := mediaEngine.getRTPParametersByKind(transceiver.kind, directions)
 	for _, rtpExtension := range parameters.HeaderExtensions {
 		if mediaSection.matchExtensions != nil {
-			if _, enabled := mediaSection.matchExtensions[rtpExtension.URI]; !enabled {
+			// An answer may only echo the extension with the ID the remote media section offered.
+			if id, enabled := mediaSection.matchExtensions[rtpExtension.URI]; !enabled || id != rtpExtension.ID {
 				continue
 			}
 		}
@@ -578,12 +754,6 @@ func addTransceiverSDP(
 		media = media.WithFingerprint(fingerprint.Algorithm, strings.ToUpper(fingerprint.Value))
 	}
 
-	if shouldAddCandidates {
-		if err := addCandidatesToMediaDescriptions(candidates, media, iceGatheringState); err != nil {
-			return false, err
-		}
-	}
-
 	descr.WithMedia(media)
 
 	return true, nil
@@ -591,11 +761,13 @@ func addTransceiverSDP(
 
 type simulcastRid struct {
 	id        string
+	direction string
 	attrValue string
 	paused    bool
 }
 
 type mediaSection struct {
+	remoteOffer     *sdp.MediaDescription
 	id              string
 	transceivers    []*RTPTransceiver
 	data            bool
@@ -605,24 +777,35 @@ type mediaSection struct {
 	cryptex         bool
 }
 
-func bundleMatchFromRemote(matchBundleGroup *string) func(mid string) bool {
-	if matchBundleGroup == nil {
-		return func(string) bool {
-			return true
+func isRejectedMediaSection(media *sdp.MediaDescription) bool {
+	if media == nil {
+		return false
+	}
+	_, bundleOnly := media.Attribute("bundle-only")
+
+	return media.MediaName.Port.Value == 0 && !bundleOnly
+}
+
+func rejectedMediaDescription(previous *sdp.MediaDescription) *sdp.MediaDescription {
+	media := sdp.NewJSEPMediaDescription(previous.MediaName.Media, nil)
+	media.MediaName = previous.MediaName
+	for _, attribute := range previous.Attributes {
+		switch attribute.Key {
+		case "rtpmap", "fmtp", "rtcp-fb":
+			media.Attributes = append(media.Attributes, attribute)
 		}
 	}
-	bundleTags := strings.Split(*matchBundleGroup, " ")
 
-	return func(midValue string) bool {
-		return slices.Contains(bundleTags, midValue)
-	}
+	return media.WithValueAttribute(sdp.AttrKeyMID, getMidValue(previous)).
+		WithPropertyAttribute(RTPTransceiverDirectionInactive.String())
 }
 
 // populateSDP serializes a PeerConnections state into an SDP.
 //
-//nolint:cyclop,gocognit
+//nolint:cyclop
 func populateSDP(
 	descr *sdp.SessionDescription,
+	isOffer bool,
 	dtlsFingerprints []DTLSFingerprint,
 	mediaDescriptionFingerprint bool,
 	isICELite bool,
@@ -633,7 +816,7 @@ func populateSDP(
 	iceParams ICEParameters,
 	mediaSections []mediaSection,
 	iceGatheringState ICEGatheringState,
-	matchBundleGroup *string,
+	matchedDescription *sdp.SessionDescription,
 	sctpMaxMessageSize uint32,
 	ignoreRidPauseForRecv bool,
 	cryptexAtSessionLevel bool,
@@ -645,52 +828,50 @@ func populateSDP(
 		mediaDtlsFingerprints = dtlsFingerprints
 	}
 
-	bundleValue := "BUNDLE"
-	bundleCount := 0
-
-	bundleMatch := bundleMatchFromRemote(matchBundleGroup)
-	appendBundle := func(midValue string) {
-		bundleValue += " " + midValue
-		bundleCount++
+	var bundleMids, matchedMids []string
+	var matchedMedia map[string]*sdp.MediaDescription
+	if matchedDescription != nil {
+		matchedMids = bundleGroupMids(matchedDescription)
+		matchedMedia = make(map[string]*sdp.MediaDescription, len(matchedDescription.MediaDescriptions))
+		for _, media := range matchedDescription.MediaDescriptions {
+			matchedMedia[getMidValue(media)] = media
+		}
 	}
 
 	haveActiveRTPMedia := false
 
-	for i, section := range mediaSections {
+	for _, section := range mediaSections {
 		if section.data && len(section.transceivers) != 0 {
 			return nil, errSDPMediaSectionMediaDataChanInvalid
 		} else if len(section.transceivers) > 1 {
 			return nil, errSDPMediaSectionMultipleTrackInvalid
 		}
 
+		if previous := matchedMedia[section.id]; isRejectedMediaSection(previous) && (!isOffer || !section.data) {
+			descr.WithMedia(rejectedMediaDescription(previous))
+
+			continue
+		}
+
 		shouldAddID := true
-		shouldAddCandidates := i == 0
 		if section.data {
-			if err = addDataMediaSection(
+			addDataMediaSection(
 				descr,
-				shouldAddCandidates,
 				mediaDtlsFingerprints,
 				section.id,
 				iceParams,
-				candidates,
 				connectionRole,
-				iceGatheringState,
 				sctpMaxMessageSize,
 				section.sctpInit,
-			); err != nil {
-				return nil, err
-			}
+			)
 		} else {
 			shouldAddID, err = addTransceiverSDP(
 				descr,
-				shouldAddCandidates,
 				mediaDtlsFingerprints,
 				mediaEngine,
 				section.id,
 				iceParams,
-				candidates,
 				connectionRole,
-				iceGatheringState,
 				section,
 				ignoreRidPauseForRecv,
 			)
@@ -699,21 +880,17 @@ func populateSDP(
 			}
 		}
 
-		if shouldAddID {
-			if bundleMatch(section.id) {
-				appendBundle(section.id)
-			} else {
-				descr.MediaDescriptions[len(descr.MediaDescriptions)-1].MediaName.Port = sdp.RangedPort{Value: 0}
-			}
+		md := descr.MediaDescriptions[len(descr.MediaDescriptions)-1]
+		if !isOffer && matchedDescription != nil && !slices.Contains(matchedMids, section.id) {
+			md.MediaName.Port.Value = 0
+		} else if shouldAddID {
+			bundleMids = append(bundleMids, section.id)
 		}
 
 		// Determine if we have any active RTP m-lines.
 		// We only add session-level Cryptex if there is at least one RTP m-line with a non-zero port.
-		if !section.data {
-			md := descr.MediaDescriptions[len(descr.MediaDescriptions)-1]
-			if md.MediaName.Port.Value != 0 && md.MediaName.Media != mediaSectionApplication {
-				haveActiveRTPMedia = true
-			}
+		if md.MediaName.Port.Value != 0 && md.MediaName.Media != mediaSectionApplication {
+			haveActiveRTPMedia = true
 		}
 	}
 
@@ -736,11 +913,32 @@ func populateSDP(
 		descr = descr.WithPropertyAttribute(sdp.AttrKeyCryptex)
 	}
 
-	if bundleCount > 0 {
-		descr = descr.WithValueAttribute(sdp.AttrKeyGroup, bundleValue)
+	if matchedDescription != nil {
+		bundleMids = orderBundleMids(bundleMids, matchedMids)
+	}
+	if len(bundleMids) > 0 {
+		descr = descr.WithValueAttribute(sdp.AttrKeyGroup, "BUNDLE "+strings.Join(bundleMids, " "))
+	}
+
+	if err = populateSDPCandidates(descr, candidates, iceGatheringState, isOffer && matchedDescription == nil); err != nil {
+		return nil, err
 	}
 
 	return descr, nil
+}
+
+// orderBundleMids preserves the negotiated order of retained MIDs and appends new ones.
+func orderBundleMids(bundleMids, matchedMids []string) []string {
+	matchedMids = slices.DeleteFunc(matchedMids, func(mid string) bool {
+		return !slices.Contains(bundleMids, mid)
+	})
+	for _, mid := range bundleMids {
+		if !slices.Contains(matchedMids, mid) {
+			matchedMids = append(matchedMids, mid)
+		}
+	}
+
+	return matchedMids
 }
 
 func getMidValue(media *sdp.MediaDescription) string {
@@ -785,7 +983,7 @@ func extractBundleID(desc *sdp.SessionDescription) string {
 	return bundleIDs[1]
 }
 
-func extractFingerprint(desc *sdp.SessionDescription) (string, string, error) { //nolint:gocognit,cyclop
+func extractFingerprint(desc *sdp.SessionDescription) (string, string, error) { //nolint:cyclop
 	fingerprint := ""
 
 	// Fingerprint on session level has highest priority
@@ -915,7 +1113,7 @@ type sdpICEDetails struct {
 func extractICEDetails(
 	desc *sdp.SessionDescription,
 	log logging.LeveledLogger,
-) (*sdpICEDetails, error) { // nolint:gocognit
+) (*sdpICEDetails, error) {
 	details := &sdpICEDetails{
 		Candidates: []ICECandidate{},
 	}
@@ -1011,12 +1209,19 @@ func codecsFromMediaDescription(mediaDescr *sdp.MediaDescription) (out []RTPCode
 		MediaDescriptions: []*sdp.MediaDescription{mediaDescr},
 	}
 	codecMap := s.GetCodecMap()
+	seenPayloadTypes := map[uint8]struct{}{}
 
 	for _, payloadStr := range mediaDescr.MediaName.Formats {
 		payloadType, err := strconv.ParseUint(payloadStr, 10, 8)
 		if err != nil {
 			return nil, err
 		}
+
+		// A payload type identifies a single codec no matter how often the m= line repeats it.
+		if _, ok := seenPayloadTypes[uint8(payloadType)]; ok {
+			continue
+		}
+		seenPayloadTypes[uint8(payloadType)] = struct{}{}
 
 		codec, ok := codecMap[uint8(payloadType)]
 		if !ok {
@@ -1027,10 +1232,14 @@ func codecsFromMediaDescription(mediaDescr *sdp.MediaDescription) (out []RTPCode
 			return nil, fmt.Errorf("%w: payload type %d", errSDPPayloadTypeNotFound, payloadType)
 		}
 
+		mimeType := mediaDescr.MediaName.Media + "/" + codec.Name
+
 		channels := uint16(0)
 		val, err := strconv.ParseUint(codec.EncodingParameters, 10, 16)
 		if err == nil {
 			channels = uint16(val)
+		} else if codec.EncodingParameters == "" {
+			channels = fmtp.DefaultChannels(mimeType)
 		}
 
 		feedback := []RTCPFeedback{}
@@ -1046,8 +1255,8 @@ func codecsFromMediaDescription(mediaDescr *sdp.MediaDescription) (out []RTPCode
 
 		out = append(out, RTPCodecParameters{
 			RTPCodecCapability: RTPCodecCapability{
-				mediaDescr.MediaName.Media + "/" + codec.Name,
-				codec.ClockRate,
+				mimeType,
+				fmtp.ClockRateOrDefault(mimeType, codec.ClockRate),
 				channels,
 				codec.Fmtp,
 				feedback,
@@ -1137,6 +1346,11 @@ func getMaxMessageSize(desc *sdp.MediaDescription) uint32 {
 }
 
 func getSctpInit(desc *sdp.MediaDescription) ([]byte, error) {
+	protos := strings.Join(desc.MediaName.Protos, "/")
+	if (protos != "UDP/DTLS/SCTP" && protos != "TCP/DTLS/SCTP") ||
+		!slices.Equal(desc.MediaName.Formats, []string{"webrtc-datachannel"}) {
+		return nil, nil
+	}
 	for _, a := range desc.Attributes {
 		if strings.TrimSpace(a.Key) == "sctp-init" {
 			decoded, err := base64.StdEncoding.DecodeString(a.Value)
