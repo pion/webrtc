@@ -7,7 +7,7 @@ require (
 	github.com/pion/dtls/v4 v4.0.1
 	github.com/pion/format v0.0.1
 	github.com/pion/ice/v5 v5.0.0-rc.9
-	github.com/pion/interceptor v0.1.51
+	github.com/pion/interceptor v1.0.0-rc.1
 	github.com/pion/logging v0.2.4
 	github.com/pion/randutil v0.1.0
 	github.com/pion/rtcp v1.2.20
