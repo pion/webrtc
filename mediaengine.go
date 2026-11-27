@@ -12,7 +12,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/pion/rtp"
 	"github.com/pion/rtp/codecs"
@@ -271,7 +270,6 @@ func (m *MediaEngine) RegisterCodec(codec RTPCodecParameters, typ RTPCodecType) 
 	defer m.mu.Unlock()
 
 	var err error
-	codec.statsID = fmt.Sprintf("RTPCodec-%d", time.Now().UnixNano())
 	switch typ {
 	case RTPCodecTypeAudio:
 		m.audioCodecs, err = m.addCodec(m.audioCodecs, codec)
@@ -443,31 +441,21 @@ func (m *MediaEngine) getCodecByPayload(payloadType PayloadType) (RTPCodecParame
 	return RTPCodecParameters{}, 0, ErrCodecNotFound
 }
 
-func (m *MediaEngine) collectStats(collector *statsReportCollector, transportStatsID string) {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-
-	statsLoop := func(codecs []RTPCodecParameters) {
-		for _, codec := range codecs {
-			collector.Collecting()
-			stats := CodecStats{
-				Timestamp:   statsTimestampFrom(time.Now()),
-				Type:        StatsTypeCodec,
-				ID:          codec.statsID,
-				TransportID: transportStatsID,
-				PayloadType: codec.PayloadType,
-				MimeType:    codec.MimeType,
-				ClockRate:   codec.ClockRate,
-				Channels:    uint8(codec.Channels), //nolint:gosec // G115
-				SDPFmtpLine: codec.SDPFmtpLine,
-			}
-
-			collector.Collect(stats.ID, stats)
-		}
-	}
-
-	statsLoop(m.videoCodecs)
-	statsLoop(m.audioCodecs)
+func (c RTPCodecParameters) collectStats(
+	collector *statsReportCollector, id string, timestamp StatsTimestamp, transportStatsID string,
+) {
+	collector.Collecting()
+	collector.Collect(id, CodecStats{
+		Timestamp:   timestamp,
+		Type:        StatsTypeCodec,
+		ID:          id,
+		TransportID: transportStatsID,
+		PayloadType: c.PayloadType,
+		MimeType:    c.MimeType,
+		ClockRate:   c.ClockRate,
+		Channels:    uint8(c.Channels), //nolint:gosec // G115
+		SDPFmtpLine: c.SDPFmtpLine,
+	})
 }
 
 // Look up a codec and enable if it exists.

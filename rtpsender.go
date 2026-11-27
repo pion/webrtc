@@ -531,7 +531,8 @@ func (r *RTPSender) collectStats(collector *statsReportCollector, statsGetter st
 			TransportID: r.transport.statsID,
 		}
 		if codecs := trackEncoding.context.params.Codecs; len(codecs) > 0 {
-			outboundStats.CodecID = codecs[0].statsID
+			outboundStats.CodecID = fmt.Sprintf("OutboundCodec%d", codecs[0].PayloadType)
+			codecs[0].collectStats(collector, outboundStats.CodecID, now, r.transport.statsID)
 		}
 		if stats := statsGetter.Get(uint32(trackEncoding.ssrc)); stats != nil {
 			outboundStats.PacketsSent = stats.OutboundRTPStreamStats.PacketsSent

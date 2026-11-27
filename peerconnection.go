@@ -3260,8 +3260,6 @@ func (pc *PeerConnection) GetStats() StatsReport {
 		sender.collectStats(statsCollector, statsGetter)
 	}
 
-	pc.api.mediaEngine.collectStats(statsCollector, pc.dtlsTransport.statsID)
-
 	return statsCollector.Ready()
 }
 

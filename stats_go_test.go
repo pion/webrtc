@@ -847,16 +847,6 @@ func getDataChannelStats(t *testing.T, report StatsReport, dc *DataChannel) Data
 	return stats
 }
 
-func getCodecStats(t *testing.T, report StatsReport, c *RTPCodecParameters) CodecStats {
-	t.Helper()
-
-	stats, ok := report.GetCodecStats(c)
-	assert.True(t, ok)
-	assert.Equal(t, stats.Type, StatsTypeCodec)
-
-	return stats
-}
-
 func getTransportStats(t *testing.T, report StatsReport, transport *DTLSTransport) TransportStats {
 	t.Helper()
 
@@ -997,6 +987,11 @@ func assertInboundRTPStats(t *testing.T, report StatsReport, pc *PeerConnection)
 				assert.NotEmpty(t, inboundStats.Kind)
 				transportStats := getTransportStats(t, report, receiver.Transport())
 				assert.Equal(t, transportStats.ID, inboundStats.TransportID)
+				codecStats, ok := report[inboundStats.CodecID].(CodecStats)
+				require.True(t, ok)
+				assert.Equal(t, tr.Codec().MimeType, codecStats.MimeType)
+				assert.Equal(t, tr.Codec().PayloadType, codecStats.PayloadType)
+				assert.Equal(t, transportStats.ID, codecStats.TransportID)
 				assert.Greater(t, inboundStats.PacketsReceived, uint64(0))
 				assert.GreaterOrEqual(t, inboundStats.PacketsLost, int64(0))
 				assert.Greater(t, inboundStats.BytesReceived, uint64(0))
@@ -1025,6 +1020,10 @@ func assertOutboundRTPStats(t *testing.T, report StatsReport, pc *PeerConnection
 		assert.Equal(t, "video", outboundStats.Kind)
 		transportStats := getTransportStats(t, report, sender.Transport())
 		assert.Equal(t, transportStats.ID, outboundStats.TransportID)
+		codecStats, ok := report[outboundStats.CodecID].(CodecStats)
+		require.True(t, ok)
+		assert.Equal(t, MimeTypeVP8, codecStats.MimeType)
+		assert.Equal(t, transportStats.ID, codecStats.TransportID)
 		assert.Greater(t, outboundStats.PacketsSent, uint64(0))
 		assert.Greater(t, outboundStats.BytesSent, uint64(0))
 		assert.Greater(t, outboundStats.HeaderBytesSent, uint64(0))
@@ -1239,13 +1238,14 @@ func TestPeerConnection_GetStats(t *testing.T) { //nolint:cyclop // involves mul
 	reportPCOffer = offerPC.GetStats()
 	assertOutboundRTPStats(t, reportPCOffer, offerPC)
 	assert.NoError(t, err)
-	for i := range offerPC.api.mediaEngine.videoCodecs {
-		codecStat := getCodecStats(t, reportPCOffer, &(offerPC.api.mediaEngine.videoCodecs[i]))
-		assert.NotEmpty(t, codecStat)
-	}
-	for i := range offerPC.api.mediaEngine.audioCodecs {
-		codecStat := getCodecStats(t, reportPCOffer, &(offerPC.api.mediaEngine.audioCodecs[i]))
-		assert.NotEmpty(t, codecStat)
+	for _, report := range []StatsReport{reportPCOffer, reportPCAnswer} {
+		codecs := 0
+		for _, s := range report {
+			if _, ok := s.(CodecStats); ok {
+				codecs++
+			}
+		}
+		assert.Equal(t, 1, codecs)
 	}
 
 	// Close answer DC now
@@ -1905,48 +1905,6 @@ func TestStatsReport_GetCertificateStats_Success(t *testing.T) {
 	}
 
 	got, ok := r.GetCertificateStats(cert)
-
-	require.True(t, ok)
-	assert.Equal(t, want, got)
-}
-
-func TestStatsReport_GetCodecStats_MissingEntry(t *testing.T) {
-	codec := &RTPCodecParameters{statsID: "CODEC1"}
-	r := StatsReport{}
-
-	got, ok := r.GetCodecStats(codec)
-
-	assert.False(t, ok)
-	assert.Equal(t, CodecStats{}, got)
-}
-
-func TestStatsReport_GetCodecStats_WrongType(t *testing.T) {
-	codec := &RTPCodecParameters{statsID: "CODEC2"}
-
-	r := StatsReport{
-		"CODEC2": PeerConnectionStats{ID: "not-codec"},
-	}
-
-	got, ok := r.GetCodecStats(codec)
-
-	assert.False(t, ok)
-	assert.Equal(t, CodecStats{}, got)
-}
-
-func TestStatsReport_GetCodecStats_Success(t *testing.T) {
-	statsID := "CODEC3"
-	codec := &RTPCodecParameters{statsID: statsID}
-
-	want := CodecStats{
-		ID:   statsID,
-		Type: StatsTypeCodec,
-	}
-
-	r := StatsReport{
-		statsID: want,
-	}
-
-	got, ok := r.GetCodecStats(codec)
 
 	require.True(t, ok)
 	assert.Equal(t, want, got)
